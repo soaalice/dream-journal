@@ -6,14 +6,14 @@ const router = express.Router();
 
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, avatarUrl } = req.body;
     
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: 'Email already registered' });
     }
     
-    const user = new User({ name, email, password });
+    const user = new User({ name, email, password, avatarUrl });
     await user.save();
     
     const token = generateToken(user._id);

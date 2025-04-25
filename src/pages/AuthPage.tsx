@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { useApp } from '../context/AppContext';
 import { LoginCredentials, RegisterData } from '../types';
 import { AlertTriangle } from 'lucide-react';
+import EmojiAvatarPicker from '../components/EmojiAvatarPicker';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -17,6 +18,7 @@ const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   confirmPassword: z.string(),
+  avatarUrl: z.string().url('Invalid URL').or(z.string().length(0)),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
@@ -32,10 +34,16 @@ const AuthPage: React.FC = () => {
       resolver: zodResolver(loginSchema)
     });
     
-  const { register: registerRegForm, handleSubmit: handleRegisterSubmit, formState: { errors: registerErrors } } = 
+  const { register: registerRegForm, handleSubmit: handleRegisterSubmit, formState: { errors: registerErrors }, setValue,
+    watch } = 
     useForm<RegisterData>({
-      resolver: zodResolver(registerSchema)
+      resolver: zodResolver(registerSchema),
+      defaultValues: {
+        avatarUrl: '',
+      }
     });
+
+  const avatarUrl = watch('avatarUrl');
   
   const onLogin = async (data: LoginCredentials) => {
     try {
@@ -123,6 +131,22 @@ const AuthPage: React.FC = () => {
           </form>
         ) : (
           <form className="space-y-6" onSubmit={handleRegisterSubmit(onRegister)}>
+              <div>
+                <label htmlFor="avatarUrl" className="block text-sm font-medium mb-1">
+                  Profile Picture
+                </label>
+                <EmojiAvatarPicker
+                  initialAvatarUrl={avatarUrl}
+                  onAvatarChange={(url) => setValue('avatarUrl', url)}
+                  isDarkMode={isDarkMode}
+                />
+                {registerErrors.avatarUrl && (
+                  <p className="mt-1 text-red-500 text-sm flex items-center">
+                    <AlertTriangle className="w-4 h-4 mr-1" />
+                    {registerErrors.avatarUrl.message}
+                  </p>
+                )}
+              </div>
             <div>
               <label htmlFor="name" className="block text-sm font-medium mb-1">
                 Name

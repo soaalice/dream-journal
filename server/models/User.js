@@ -36,7 +36,7 @@ const userSchema = new mongoose.Schema({
   },
   avatarUrl: {
     type: String,
-    default: 'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=150'
+    default: 'https://api.dicebear.com/8.x/fun-emoji/svg?eyes=plain&mouth=smileTeeth&backgroundColor=a0c4ff'
   },
   dreamCount: {
     type: Number,

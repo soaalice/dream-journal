@@ -71,6 +71,7 @@ export interface RegisterData {
   email: string;
   password: string;
   confirmPassword: string;
+  avatarUrl: string;
 }
 
 export interface ProfileUpdateData {
