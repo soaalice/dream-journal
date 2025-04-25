@@ -16,7 +16,11 @@ export interface Dream {
   content: string;
   createdAt: string;
   updatedAt: string;
-  userId: string;
+  userId: {
+    _id: string;
+    name: string;
+    avatarUrl: string;
+  };
   userName: string;
   privacyLevel: PrivacyLevel;
   tags: string[];

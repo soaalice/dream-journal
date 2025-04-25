@@ -97,7 +97,7 @@ const DreamCard: React.FC<DreamCardProps> = ({
             {!isAnonymous && (
               <div onClick={handleProfileClick}>
                 <Avatar
-                  src={user?._id === userId ? user.avatarUrl : 'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=150'}
+                  src={user?._id === userId._id ? user.avatarUrl : 'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=150'}
                   alt={userName}
                   size="md"
                 />
