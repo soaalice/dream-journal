@@ -30,7 +30,7 @@ const DreamDetailPage: React.FC = () => {
     );
   }
 
-  const isOwnDream = user?._id === dream.userId;
+  const isOwnDream = user?.id === dream.userId._id;
   const isAnonymous = dream.privacyLevel === 'anonymous';
 
   return (
@@ -56,7 +56,7 @@ const DreamDetailPage: React.FC = () => {
           <div className="flex items-center space-x-3">
             {!isAnonymous && (
               <Avatar
-                src={user?._id === dream.userId ? user.avatarUrl : 'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=150'}
+                src={dream.userId.avatarUrl}
                 alt={dream.userName}
                 size="lg"
               />
