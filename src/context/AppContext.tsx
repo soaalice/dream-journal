@@ -221,7 +221,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const userDreamsList = dreamsList.filter(dream =>
-    authState.user?.id === dream.userId._id
+    authState.user?._id === dream.userId._id
   );
 
   const publicFeedList = dreamsList.filter(dream =>
