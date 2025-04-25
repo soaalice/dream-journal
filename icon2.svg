@@ -1,0 +1,55 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Circular background -->
+  <circle cx="100" cy="100" r="90" fill="#ede9fe" />
+  
+  <!-- Crescent moon -->
+  <path d="M100,30 A70,70 0 1,1 100,170 A50,50 0 1,0 100,30 Z" 
+        fill="#c4b5fd" stroke="#a78bfa" stroke-width="1.5" />
+  
+  <!-- Open book in the middle -->
+  <g transform="translate(100, 100) scale(1.2)">
+    <!-- Left page -->
+    <path d="M-30,-15 C-20,-20 -10,-20 0,-15 L0,15 C-10,10 -20,10 -30,15 Z" 
+          fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.5" />
+    
+    <!-- Right page -->
+    <path d="M0,-15 C10,-20 20,-20 30,-15 L30,15 C20,10 10,10 0,15 Z" 
+          fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.5" />
+    
+    <!-- Book spine -->
+    <line x1="0" y1="-15" x2="0" y2="15" stroke="#7c3aed" stroke-width="1.5" />
+    
+    <!-- Page lines (left) -->
+    <line x1="-25" y1="-5" x2="-5" y2="-5" stroke="#a78bfa" stroke-width="0.5" stroke-opacity="0.7" />
+    <line x1="-25" y1="0" x2="-5" y2="0" stroke="#a78bfa" stroke-width="0.5" stroke-opacity="0.7" />
+    <line x1="-25" y1="5" x2="-5" y2="5" stroke="#a78bfa" stroke-width="0.5" stroke-opacity="0.7" />
+    
+    <!-- Page lines (right) -->
+    <line x1="5" y1="-5" x2="25" y2="-5" stroke="#a78bfa" stroke-width="0.5" stroke-opacity="0.7" />
+    <line x1="5" y1="0" x2="25" y2="0" stroke="#a78bfa" stroke-width="0.5" stroke-opacity="0.7" />
+    <line x1="5" y1="5" x2="25" y2="5" stroke="#a78bfa" stroke-width="0.5" stroke-opacity="0.7" />
+  </g>
+  
+  <!-- Stars (all yellow) -->
+  <path d="M55,60 L58,53 L61,60 L68,63 L61,66 L58,73 L55,66 L48,63 Z" 
+        fill="#fcd34d" stroke="#f5f3ff" stroke-width="0.5" />
+  
+  <path d="M140,70 L142,65 L144,70 L149,72 L144,74 L142,79 L140,74 L135,72 Z" 
+        fill="#fcd34d" stroke="#f5f3ff" stroke-width="0.5" />
+  
+  <path d="M120,140 L122,135 L124,140 L129,142 L124,144 L122,149 L120,144 L115,142 Z" 
+        fill="#fcd34d" stroke="#f5f3ff" stroke-width="0.5" />
+  
+  <!-- Small sparkles (also yellow) -->
+  <circle cx="70" cy="110" r="2" fill="#fcd34d" />
+  <circle cx="140" cy="110" r="1.5" fill="#fcd34d" />
+  <circle cx="90" cy="50" r="1.5" fill="#fcd34d" />
+  <circle cx="110" cy="150" r="2" fill="#fcd34d" />
+  
+  <!-- Additional stars for better balance -->
+  <path d="M50,120 L51,117 L52,120 L55,121 L52,122 L51,125 L50,122 L47,121 Z" 
+        fill="#fcd34d" stroke="#f5f3ff" stroke-width="0.5" />
+  
+  <path d="M150,40 L151,37 L152,40 L155,41 L152,42 L151,45 L150,42 L147,41 Z" 
+        fill="#fcd34d" stroke="#f5f3ff" stroke-width="0.5" />
+</svg>
