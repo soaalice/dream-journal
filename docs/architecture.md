@@ -18,13 +18,25 @@ server/
     asyncHandler.js   async route wrapper and HttpError
   test/               node:test unit tests
 src/
-  lib/api.ts          the only place that calls fetch (base URL, cookies, errors, 401 handling)
+  lib/
+    api.ts            the only place that calls fetch (base URL, cookies, errors, 401 handling)
+    storage.ts        localStorage wrapper that never throws
+    moods.tsx         mood and privacy presentation config (single source of truth)
   context/
+    ThemeContext.tsx  light/dark (a `dark` class on <html>)
     AuthContext.tsx   session: login, register, logout, profile, password, account deletion
-    AppContext.tsx    dreams store, theme, dream/comment/follow actions; useApp() = auth + app
-  pages/, components/ UI
+    AppContext.tsx    dreams store, dream/comment/follow actions; useApp() = auth + app
+  hooks/              useDebounce, useInfiniteScroll, useDocumentTitle
+  layouts/            AppLayout, Header, BottomNav, RequireAuth
+  components/
+    ui/               design-system primitives (Button, Field, Modal, Toast, Confirm, Skeleton...)
+    dream/            dream-specific pieces (ShareButton, RelativeTime)
+    *.tsx             feature components (DreamCard, DreamForm, CommentSection, MentionsInput...)
+  pages/              one lazy-loaded component per route
   types/              shared client types (mirror the serialized API shapes)
 ```
+
+See [design-system.md](design-system.md) for the UI conventions.
 
 ## Request flow
 
@@ -71,9 +83,10 @@ Dream count, followers count and following count are **computed**, not stored, s
 - **`lib/api.ts`** sends `credentials: 'include'`, parses errors into `ApiError`, and calls a
   registered handler on `401` so an expired session logs the user out everywhere.
 - **`AppContext`** keeps dreams in a map keyed by id, so a like/comment response replaces the
-  dream in place. The store is reset and reloaded when the signed-in user changes (so `likedByMe`
+  dream in place. Likes are optimistic and roll back on failure. The store is reset and reloaded when the signed-in user changes (so `likedByMe`
   and `isOwner` are always correct for the current viewer).
-- **Explore** filters, searches (Mongo text search) and paginates on the server.
+- **Explore** filters, searches (Mongo text search) and paginates on the server, with infinite scroll.
+  Its filters live in the URL query string.
 - **Detail / edit pages** fetch their dream by id (`GET /dreams/:id`), so deep links and private
   dreams work even when the dream is not in the preloaded feed.
 

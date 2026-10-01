@@ -1,26 +1,25 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 interface TagBadgeProps {
   tag: string;
-  size?: 'sm' | 'md' | 'lg';
-  onClick?: (e: React.MouseEvent) => void;
+  size?: 'sm' | 'md';
+  /** when true the tag links to the Explore page filtered by it */
+  link?: boolean;
 }
 
-const TagBadge: React.FC<TagBadgeProps> = ({ tag, size = 'md', onClick }) => {
-  const sizeClasses = {
-    sm: 'text-xs px-2 py-0.5',
-    md: 'text-sm px-2.5 py-1',
-    lg: 'text-base px-3 py-1.5'
-  };
-  
-  return (
-    <span 
-      className={`inline-block rounded-full bg-purple-100 text-purple-800 ${sizeClasses[size]} font-medium cursor-pointer hover:bg-purple-200 transition-colors`}
-      onClick={onClick}
-    >
+const classes = (size: 'sm' | 'md') =>
+  `inline-block rounded-full bg-accent-soft font-medium text-accent-text transition hover:brightness-95 ${
+    size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-2.5 py-1 text-sm'
+  }`;
+
+const TagBadge: React.FC<TagBadgeProps> = ({ tag, size = 'md', link = true }) =>
+  link ? (
+    <Link to={`/explore?tag=${encodeURIComponent(tag)}`} className={`${classes(size)} relative z-10`}>
       #{tag}
-    </span>
+    </Link>
+  ) : (
+    <span className={classes(size)}>#{tag}</span>
   );
-};
 
 export default TagBadge;

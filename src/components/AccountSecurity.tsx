@@ -1,113 +1,112 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useApp } from '../context/AppContext';
-
-const inputClasses = (dark: boolean) => `
-  w-full px-4 py-2 rounded-md border
-  ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}
-  focus:outline-none focus:ring-2 focus:ring-purple-500
-`;
+import { useAuth } from '../context/AuthContext';
+import { Button } from './ui/Button';
+import { Card } from './ui/Card';
+import { useConfirm } from './ui/Confirm';
+import { Field, PasswordInput } from './ui/Field';
+import { useToast } from './ui/Toast';
 
 const passwordRules = /^(?=.*[A-Za-z])(?=.*\d).{8,72}$/;
 
 /** Password change and account deletion, shown on the profile edit page. */
 const AccountSecurity: React.FC = () => {
   const navigate = useNavigate();
-  const { changePassword, deleteAccount, isDarkMode } = useApp();
+  const toast = useToast();
+  const confirm = useConfirm();
+  const { user, changePassword, deleteAccount } = useAuth();
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const [passwordMessage, setPasswordMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [passwordError, setPasswordError] = useState<string>();
+  const [changing, setChanging] = useState(false);
 
   const [deletePassword, setDeletePassword] = useState('');
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string>();
+  const [deleting, setDeleting] = useState(false);
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!passwordRules.test(newPassword)) {
-      setPasswordMessage({ ok: false, text: 'New password needs 8-72 characters with a letter and a number' });
+      setPasswordError('Use 8-72 characters with at least one letter and one number');
       return;
     }
+    setChanging(true);
     try {
       await changePassword({ currentPassword, newPassword });
       setCurrentPassword('');
       setNewPassword('');
-      setPasswordMessage({ ok: true, text: 'Password updated' });
+      setPasswordError(undefined);
+      toast.success('Password updated');
     } catch (err) {
-      setPasswordMessage({ ok: false, text: err instanceof Error ? err.message : 'Failed to update password' });
+      setPasswordError(err instanceof Error ? err.message : 'Failed to update password');
+    } finally {
+      setChanging(false);
     }
   };
 
   const handleDelete = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!window.confirm('This permanently deletes your account and all your dreams. Continue?')) return;
+    const ok = await confirm({
+      title: 'Delete your account?',
+      description: 'Your profile, dreams, comments and likes will be permanently removed. This cannot be undone.',
+      confirmLabel: 'Delete everything',
+      danger: true,
+      requireText: user?.name ?? 'DELETE'
+    });
+    if (!ok) return;
+
+    setDeleting(true);
     try {
       await deleteAccount(deletePassword);
+      toast.success('Your account has been deleted');
       navigate('/');
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : 'Failed to delete account');
+      setDeleting(false);
     }
   };
 
-  const card = `rounded-lg p-6 mt-8 ${isDarkMode ? 'bg-gray-800' : 'bg-white'} shadow`;
-
   return (
-    <>
-      <form onSubmit={handleChangePassword} className={`${card} space-y-4`}>
-        <h2 className="text-xl font-serif font-bold">Change password</h2>
-        <input
-          type="password"
-          autoComplete="current-password"
-          placeholder="Current password"
-          value={currentPassword}
-          onChange={(e) => setCurrentPassword(e.target.value)}
-          className={inputClasses(isDarkMode)}
-        />
-        <input
-          type="password"
-          autoComplete="new-password"
-          placeholder="New password"
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
-          className={inputClasses(isDarkMode)}
-        />
-        {passwordMessage && (
-          <p role="alert" className={`text-sm ${passwordMessage.ok ? 'text-green-600' : 'text-red-500'}`}>
-            {passwordMessage.text}
-          </p>
-        )}
-        <button
-          type="submit"
-          disabled={!currentPassword || !newPassword}
-          className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50"
-        >
-          Update password
-        </button>
-      </form>
+    <div className="mt-10 space-y-6">
+      <Card as="section" aria-labelledby="password-title">
+        <form onSubmit={handleChangePassword} className="space-y-4">
+          <h2 id="password-title" className="font-serif text-xl font-bold">
+            Change password
+          </h2>
+          <Field label="Current password">
+            {({ id, invalid }) => (
+              <PasswordInput id={id} invalid={invalid} autoComplete="current-password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
+            )}
+          </Field>
+          <Field label="New password" hint="8-72 characters, with a letter and a number" error={passwordError}>
+            {({ id, describedBy, invalid }) => (
+              <PasswordInput id={id} aria-describedby={describedBy} invalid={invalid} autoComplete="new-password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+            )}
+          </Field>
+          <Button type="submit" loading={changing} disabled={!currentPassword || !newPassword}>
+            Update password
+          </Button>
+        </form>
+      </Card>
 
-      <form onSubmit={handleDelete} className={`${card} space-y-4 border border-red-300`}>
-        <h2 className="text-xl font-serif font-bold text-red-600">Delete account</h2>
-        <p className="text-sm text-gray-500">
-          Removes your profile, dreams, comments and likes. This cannot be undone.
-        </p>
-        <input
-          type="password"
-          autoComplete="current-password"
-          placeholder="Confirm with your password"
-          value={deletePassword}
-          onChange={(e) => setDeletePassword(e.target.value)}
-          className={inputClasses(isDarkMode)}
-        />
-        {deleteError && <p role="alert" className="text-sm text-red-500">{deleteError}</p>}
-        <button
-          type="submit"
-          disabled={!deletePassword}
-          className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
-        >
-          Delete my account
-        </button>
-      </form>
-    </>
+      <Card as="section" aria-labelledby="delete-title" className="border-danger/40">
+        <form onSubmit={handleDelete} className="space-y-4">
+          <h2 id="delete-title" className="font-serif text-xl font-bold text-danger-text">
+            Delete account
+          </h2>
+          <p className="text-sm text-muted">Removes your profile, dreams, comments and likes. This cannot be undone.</p>
+          <Field label="Confirm with your password" error={deleteError}>
+            {({ id, describedBy, invalid }) => (
+              <PasswordInput id={id} aria-describedby={describedBy} invalid={invalid} autoComplete="current-password" value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} />
+            )}
+          </Field>
+          <Button type="submit" variant="danger" loading={deleting} disabled={!deletePassword}>
+            Delete my account
+          </Button>
+        </form>
+      </Card>
+    </div>
   );
 };
 

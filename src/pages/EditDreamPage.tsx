@@ -1,12 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { SearchX } from 'lucide-react';
 import DreamForm from '../components/DreamForm';
 import { useApp } from '../context/AppContext';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { ButtonLink } from '../components/ui/Button';
+import { EmptyState } from '../components/ui/EmptyState';
+import { Skeleton } from '../components/ui/Skeleton';
 
 const EditDreamPage: React.FC = () => {
+  useDocumentTitle('Edit dream');
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { allDreams, fetchDream, isDarkMode } = useApp();
+  const { allDreams, fetchDream } = useApp();
   const [status, setStatus] = useState<'loading' | 'ready' | 'missing'>('loading');
 
   const dream = allDreams.find((d) => d._id === id);
@@ -22,21 +28,33 @@ const EditDreamPage: React.FC = () => {
     };
   }, [id, fetchDream]);
 
+  // Only the author may edit; everyone else goes back to the read-only page.
   useEffect(() => {
-    // Only the author may edit; send everyone else back to the dream.
     if (status === 'ready' && dream && !dream.isOwner) navigate(`/dream/${dream._id}`, { replace: true });
   }, [status, dream, navigate]);
 
   if (status === 'missing' || (status === 'ready' && !dream)) {
-    return <div className="max-w-4xl mx-auto px-4 py-8">Dream not found.</div>;
+    return (
+      <EmptyState
+        icon={<SearchX className="h-12 w-12" />}
+        title="Dream not found"
+        action={<ButtonLink to="/profile">Back to my dreams</ButtonLink>}
+      />
+    );
   }
+
   if (!dream || !dream.isOwner) {
-    return <div className="max-w-4xl mx-auto px-4 py-8 text-gray-500">Loading...</div>;
+    return (
+      <div className="mx-auto max-w-2xl space-y-4" role="status" aria-label="Loading">
+        <Skeleton className="h-8 w-1/2" />
+        <Skeleton className="h-48 w-full" />
+      </div>
+    );
   }
 
   return (
-    <div className={`max-w-4xl mx-auto px-4 py-8 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-      <h1 className="text-3xl font-serif font-bold mb-6">Edit Dream</h1>
+    <div className="mx-auto max-w-2xl animate-fade-in">
+      <h1 className="mb-8 font-serif text-3xl font-bold">Edit dream</h1>
       <DreamForm
         editMode
         dreamId={dream._id}

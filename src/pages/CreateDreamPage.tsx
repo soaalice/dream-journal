@@ -1,17 +1,14 @@
 import React from 'react';
 import DreamForm from '../components/DreamForm';
-import { useApp } from '../context/AppContext';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 const CreateDreamPage: React.FC = () => {
-  const { isDarkMode } = useApp();
-  
+  useDocumentTitle('Record a dream');
+
   return (
-    <div className={`max-w-4xl mx-auto px-4 py-8 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-      <h1 className="text-3xl font-serif font-bold mb-2">Record New Dream</h1>
-      <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-600'} mb-6`}>
-        Share your dream experience. The more details you include, the more meaningful it will be.
-      </p>
-      
+    <div className="mx-auto max-w-2xl animate-fade-in">
+      <h1 className="mb-1 font-serif text-3xl font-bold">Record a dream</h1>
+      <p className="mb-8 text-muted">Write it down while it is fresh. Your draft is saved automatically.</p>
       <DreamForm />
     </div>
   );

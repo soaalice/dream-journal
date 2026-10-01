@@ -1,21 +1,34 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { CalendarDays, Moon, PenLine, Settings, UserCheck, UserPlus } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
+import { CalendarDays, CloudOff, Link as LinkIcon, MapPin, Moon, PenLine, Settings, UserCheck, UserPlus } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { Dream, PrivacyLevel, User } from '../types';
 import { formatDate } from '../utils/date';
 import DreamCard from '../components/DreamCard';
 import Avatar from '../components/ui/Avatar';
-import { Dream, User } from '../types';
+import { Button, ButtonLink } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
+import { EmptyState } from '../components/ui/EmptyState';
+import { DreamGridSkeleton, Skeleton } from '../components/ui/Skeleton';
+import { useToast } from '../components/ui/Toast';
+
+type Tab = 'all' | PrivacyLevel;
+const TABS: Tab[] = ['all', 'public', 'private', 'anonymous'];
+const TAB_LABEL: Record<Tab, string> = { all: 'All', public: 'Public', private: 'Private', anonymous: 'Anonymous' };
 
 const ProfilePage: React.FC = () => {
-  const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { user: me, userDreams, isDarkMode, getUser, fetchUserDreams, toggleFollow } = useApp();
-  const [filter, setFilter] = useState<'all' | 'public' | 'private' | 'anonymous'>('all');
-  const [other, setOther] = useState<{ user: User; dreams: Dream[] } | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const toast = useToast();
+  const { user: me } = useAuth();
+  const { userDreams, feedLoading, getUser, fetchUserDreams, toggleFollow } = useApp();
+  const [params, setParams] = useSearchParams();
 
   const isOwnProfile = !id || id === me?._id;
+  const [other, setOther] = useState<{ user: User; dreams: Dream[] } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (isOwnProfile || !id) {
@@ -24,200 +37,186 @@ const ProfilePage: React.FC = () => {
     }
     let cancelled = false;
     setOther(null);
-    setLoadError(null);
+    setError(null);
     Promise.all([getUser(id), fetchUserDreams(id)])
       .then(([profile, dreams]) => !cancelled && setOther({ user: profile, dreams }))
-      .catch((err) => !cancelled && setLoadError(err instanceof Error ? err.message : 'Failed to load profile'));
+      .catch((err) => !cancelled && setError(err instanceof Error ? err.message : 'Failed to load profile'));
     return () => {
       cancelled = true;
     };
-  }, [id, isOwnProfile, getUser, fetchUserDreams]);
+  }, [id, isOwnProfile, attempt, getUser, fetchUserDreams]);
+
+  const profile = isOwnProfile ? me : other?.user ?? null;
+  const dreams = isOwnProfile ? userDreams : other?.dreams ?? [];
+
+  useDocumentTitle(profile?.name);
+
+  // The active tab is kept in the URL so it survives reloads and can be linked to.
+  const tabParam = params.get('tab') as Tab | null;
+  const tab: Tab = tabParam && TABS.includes(tabParam) ? tabParam : 'all';
+  const selectTab = useCallback(
+    (next: Tab) => setParams(next === 'all' ? {} : { tab: next }, { replace: true }),
+    [setParams]
+  );
 
   const handleFollow = async () => {
     if (!other) return;
     try {
       const updated = await toggleFollow(other.user._id);
       setOther({ ...other, user: updated });
+      toast.success(updated.isFollowing ? `You follow ${updated.name}` : `You unfollowed ${updated.name}`);
     } catch (err) {
-      setLoadError(err instanceof Error ? err.message : 'Failed to update follow');
+      toast.error(err instanceof Error ? err.message : 'Failed to update follow');
     }
   };
 
-  const user = isOwnProfile ? me : other?.user ?? null;
-  const dreamsOfProfile = isOwnProfile ? userDreams : other?.dreams ?? [];
-
-  if (!isOwnProfile && !other) {
+  if (error) {
     return (
-      <div className="flex justify-center py-16 text-gray-500">
-        {loadError ?? 'Loading...'}
+      <EmptyState
+        tone="error"
+        icon={<CloudOff className="h-12 w-12" />}
+        title="Could not load this profile"
+        description={error}
+        action={<Button onClick={() => setAttempt((a) => a + 1)}>Retry</Button>}
+      />
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="space-y-6" role="status" aria-label="Loading profile">
+        <Skeleton className="h-36 w-full rounded-xl" />
+        <DreamGridSkeleton count={2} />
       </div>
     );
   }
 
-  if (!user) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64">
-        <h2 className="text-xl mb-4">Please log in to view your profile</h2>
-        <button
-          onClick={() => navigate('/auth')}
-          className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors duration-200"
-        >
-          Log In
-        </button>
-      </div>
-    );
-  }
-
-  const filteredDreams = filter === 'all'
-    ? dreamsOfProfile
-    : dreamsOfProfile.filter(dream => dream.privacyLevel === filter);
-
-  const tabClasses = {
-    active: `
-      border-b-2 border-purple-600 font-medium text-purple-600
-    `,
-    inactive: `
-      text-gray-500 hover:text-gray-700 hover:border-gray-300 border-b-2 border-transparent
-    `
+  const counts: Record<Tab, number> = {
+    all: dreams.length,
+    public: dreams.filter((d) => d.privacyLevel === 'public').length,
+    private: dreams.filter((d) => d.privacyLevel === 'private').length,
+    anonymous: dreams.filter((d) => d.privacyLevel === 'anonymous').length
   };
+  const visibleTabs = isOwnProfile ? TABS : [];
+  const filtered = tab === 'all' ? dreams : dreams.filter((d) => d.privacyLevel === tab);
+  const loadingOwn = isOwnProfile && feedLoading;
 
   return (
-    <div className={`max-w-4xl mx-auto px-4 py-8 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-      <div className={`
-        rounded-lg overflow-hidden shadow-lg
-        ${isDarkMode ? 'bg-gray-800' : 'bg-white'}
-        p-6 mb-8
-      `}>
-        <div className="md:flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Avatar src={user.avatarUrl} alt={user.name} size="xl" />
-            <div>
-              <h1 className="text-2xl font-bold">{user.name}</h1>
-              <div className="flex items-center text-sm text-gray-500 mt-1">
-                <CalendarDays className="h-4 w-4 mr-1" />
-                <span>Joined {formatDate(new Date(user.joinedAt))}</span>
-              </div>
+    <div className="animate-fade-in">
+      <Card className="mb-8">
+        <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+          <div className="flex items-start gap-4">
+            <Avatar src={profile.avatarUrl} name={profile.name} size="xl" />
+            <div className="min-w-0">
+              <h1 className="font-serif text-2xl font-bold">{profile.name}</h1>
+              {profile.bio && <p className="mt-1 max-w-prose text-muted">{profile.bio}</p>}
+              <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
+                <li className="flex items-center gap-1">
+                  <CalendarDays className="h-4 w-4" aria-hidden />
+                  Joined {formatDate(profile.joinedAt)}
+                </li>
+                {profile.location && (
+                  <li className="flex items-center gap-1">
+                    <MapPin className="h-4 w-4" aria-hidden />
+                    {profile.location}
+                  </li>
+                )}
+                {profile.website && (
+                  <li className="flex items-center gap-1">
+                    <LinkIcon className="h-4 w-4" aria-hidden />
+                    <a href={profile.website} target="_blank" rel="noopener noreferrer nofollow" className="text-accent-text hover:underline">
+                      {profile.website.replace(/^https?:\/\//, '')}
+                    </a>
+                  </li>
+                )}
+              </ul>
+              <dl className="mt-3 flex gap-5 text-sm">
+                <div className="flex items-center gap-1.5">
+                  <Moon className="h-4 w-4 text-accent-text" aria-hidden />
+                  <dt className="sr-only">Dreams</dt>
+                  <dd>
+                    <strong>{profile.dreamCount}</strong> dreams
+                  </dd>
+                </div>
+                <div>
+                  <dt className="sr-only">Followers</dt>
+                  <dd>
+                    <strong>{profile.followersCount}</strong> followers
+                  </dd>
+                </div>
+                <div>
+                  <dt className="sr-only">Following</dt>
+                  <dd>
+                    <strong>{profile.followingCount}</strong> following
+                  </dd>
+                </div>
+              </dl>
             </div>
           </div>
 
-          <div className="mt-4 md:mt-0 flex flex-wrap gap-2">
-            <div className={`
-              flex items-center gap-2 px-4 py-2 rounded-md
-              ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}
-            `}>
-              <Moon className="h-5 w-5 text-purple-600" />
-              <span className="font-medium">{user.dreamCount} Dreams</span>
-            </div>
-
-            <div className={`px-4 py-2 rounded-md ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
-              <span className="font-medium">{user.followersCount} Followers</span>
-              <span className="mx-2 text-gray-400">•</span>
-              <span className="font-medium">{user.followingCount} Following</span>
-            </div>
-
-            {!isOwnProfile && (
-              <button
-                onClick={handleFollow}
-                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors duration-200"
-              >
-                {user.isFollowing ? <UserCheck className="h-5 w-5" /> : <UserPlus className="h-5 w-5" />}
-                {user.isFollowing ? 'Following' : 'Follow'}
-              </button>
+          <div className="flex flex-wrap gap-2">
+            {isOwnProfile ? (
+              <>
+                <ButtonLink to="/profile/edit" variant="secondary">
+                  <Settings className="h-4 w-4" aria-hidden />
+                  Edit profile
+                </ButtonLink>
+                <ButtonLink to="/new">
+                  <PenLine className="h-4 w-4" aria-hidden />
+                  New dream
+                </ButtonLink>
+              </>
+            ) : (
+              <Button onClick={handleFollow} variant={profile.isFollowing ? 'secondary' : 'primary'} aria-pressed={profile.isFollowing}>
+                {profile.isFollowing ? <UserCheck className="h-4 w-4" aria-hidden /> : <UserPlus className="h-4 w-4" aria-hidden />}
+                {profile.isFollowing ? 'Following' : 'Follow'}
+              </Button>
             )}
-
-            {isOwnProfile && (<>
-            <button
-              onClick={() => navigate('/profile/edit')}
-              className={`
-                flex items-center gap-2 px-4 py-2 rounded-md
-                ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'}
-                transition-colors duration-200
-              `}
-            >
-              <Settings className="h-5 w-5" />
-              Edit Profile
-            </button>
-
-            <button
-              onClick={() => navigate('/new')}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors duration-200"
-            >
-              <PenLine className="h-5 w-5" />
-              New Dream
-            </button>
-            </>)}
           </div>
         </div>
-      </div>
+      </Card>
 
-      {user.bio && <p className="mb-6 text-gray-500">{user.bio}</p>}
-
-      {isOwnProfile && (
-      <div className="mb-6">
-        <div className="border-b border-gray-200">
-          <nav className="flex space-x-8">
+      {visibleTabs.length > 0 && (
+        <div role="tablist" aria-label="Filter dreams" className="mb-6 flex gap-1 overflow-x-auto border-b border-line">
+          {visibleTabs.map((t) => (
             <button
-              onClick={() => setFilter('all')}
-              className={`py-4 px-1 ${filter === 'all' ? tabClasses.active : tabClasses.inactive}`}
+              key={t}
+              type="button"
+              role="tab"
+              aria-selected={tab === t}
+              onClick={() => selectTab(t)}
+              className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
+                tab === t ? 'border-accent text-accent-text' : 'border-transparent text-muted hover:text-fg'
+              }`}
             >
-              All Dreams
+              {TAB_LABEL[t]} <span className="ml-1 tabular-nums text-muted">({counts[t]})</span>
             </button>
-            <button
-              onClick={() => setFilter('public')}
-              className={`py-4 px-1 ${filter === 'public' ? tabClasses.active : tabClasses.inactive}`}
-            >
-              Public
-            </button>
-            <button
-              onClick={() => setFilter('private')}
-              className={`py-4 px-1 ${filter === 'private' ? tabClasses.active : tabClasses.inactive}`}
-            >
-              Private
-            </button>
-            <button
-              onClick={() => setFilter('anonymous')}
-              className={`py-4 px-1 ${filter === 'anonymous' ? tabClasses.active : tabClasses.inactive}`}
-            >
-              Anonymous
-            </button>
-          </nav>
+          ))}
         </div>
-      </div>
       )}
-      
-      <div>
-        {filteredDreams.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {filteredDreams.map((dream) => (
-              <DreamCard key={dream._id} dream={dream} showPrivacy={isOwnProfile} />
-            ))}
-          </div>
-        ) : (
-          <div className={`
-            text-center py-16
-            ${isDarkMode ? 'bg-gray-800' : 'bg-gray-50'}
-            rounded-lg
-          `}>
-            <Moon className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium mb-2">No dreams found</h3>
-            <p className="text-gray-500 mb-4">
-              {!isOwnProfile
-                ? 'No public dreams yet.'
-                : filter === 'all'
-                  ? "You haven't recorded any dreams yet."
-                  : `You don't have any ${filter} dreams.`}
-            </p>
-            {isOwnProfile && (
-              <button
-                onClick={() => navigate('/new')}
-                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors duration-200"
-              >
-                Record New Dream
-              </button>
-            )}
-          </div>
-        )}
-      </div>
+
+      {loadingOwn ? (
+        <DreamGridSkeleton count={2} />
+      ) : filtered.length > 0 ? (
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2" role={visibleTabs.length ? 'tabpanel' : undefined}>
+          {filtered.map((dream) => (
+            <DreamCard key={dream._id} dream={dream} showPrivacy={isOwnProfile && tab === 'all'} />
+          ))}
+        </div>
+      ) : (
+        <EmptyState
+          icon={<Moon className="h-12 w-12" />}
+          title="No dreams here yet"
+          description={
+            !isOwnProfile
+              ? 'This person has not shared any public dreams yet.'
+              : tab === 'all'
+                ? 'Your journal is empty. Record your first dream while you still remember it.'
+                : `You have no ${tab} dreams.`
+          }
+          action={isOwnProfile ? <ButtonLink to="/new">Record a dream</ButtonLink> : undefined}
+        />
+      )}
     </div>
   );
 };

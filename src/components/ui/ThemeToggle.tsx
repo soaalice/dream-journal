@@ -1,21 +1,18 @@
 import React from 'react';
 import { Moon, Sun } from 'lucide-react';
-import { useApp } from '../../context/AppContext';
+import { useTheme } from '../../context/ThemeContext';
 
 const ThemeToggle: React.FC = () => {
-  const { isDarkMode, setIsDarkMode } = useApp();
+  const { isDarkMode, toggleTheme } = useTheme();
 
   return (
-    <button 
-      onClick={() => setIsDarkMode(!isDarkMode)}
-      className="p-2 rounded-full transition-colors duration-200 ease-in-out"
-      aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+    <button
+      type="button"
+      onClick={toggleTheme}
+      className="flex h-11 w-11 items-center justify-center rounded-full text-fg transition-colors hover:bg-surface-2 sm:h-10 sm:w-10"
+      aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
     >
-      {isDarkMode ? (
-        <Sun className="h-5 w-5 text-yellow-300" />
-      ) : (
-        <Moon className="h-5 w-5 text-indigo-800" />
-      )}
+      {isDarkMode ? <Sun className="h-5 w-5 text-yellow-300" /> : <Moon className="h-5 w-5 text-indigo-700" />}
     </button>
   );
 };

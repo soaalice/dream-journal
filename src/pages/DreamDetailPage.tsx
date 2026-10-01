@@ -1,26 +1,41 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit, Trash2 } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, Edit, Heart, SearchX, Trash2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
-import { formatDate } from '../utils/date';
-import MoodBadge from '../components/ui/MoodBadge';
-import TagBadge from '../components/ui/TagBadge';
-import PrivacyBadge from '../components/ui/PrivacyBadge';
-import CommentSection from '../components/CommentSection';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { MOODS } from '../lib/moods';
+import { Button, ButtonLink } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
+import { useConfirm } from '../components/ui/Confirm';
+import { EmptyState } from '../components/ui/EmptyState';
+import { Skeleton } from '../components/ui/Skeleton';
+import { useToast } from '../components/ui/Toast';
 import Avatar from '../components/ui/Avatar';
+import MoodBadge from '../components/ui/MoodBadge';
+import PrivacyBadge from '../components/ui/PrivacyBadge';
+import TagBadge from '../components/ui/TagBadge';
+import CommentSection from '../components/CommentSection';
+import RelativeTime from '../components/dream/RelativeTime';
+import ShareButton from '../components/dream/ShareButton';
 
 const DreamDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { allDreams, fetchDream, deleteDream, isDarkMode } = useApp();
-  const [status, setStatus] = useState<'loading' | 'ready' | 'missing'>('loading');
-  const [actionError, setActionError] = useState<string | null>(null);
+  const toast = useToast();
+  const confirm = useConfirm();
+  const { isAuthenticated } = useAuth();
+  const { allDreams, fetchDream, deleteDream, likeDream } = useApp();
 
-  const dream = allDreams.find(d => d._id === id);
+  const [status, setStatus] = useState<'loading' | 'ready' | 'missing'>('loading');
+  const dream = allDreams.find((d) => d._id === id);
+
+  useDocumentTitle(dream?.title);
 
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
+    setStatus('loading');
     fetchDream(id)
       .then(() => !cancelled && setStatus('ready'))
       .catch(() => !cancelled && setStatus('missing'));
@@ -29,121 +44,141 @@ const DreamDetailPage: React.FC = () => {
     };
   }, [id, fetchDream]);
 
-  const handleDelete = async () => {
-    if (!dream || !window.confirm('Delete this dream permanently?')) return;
-    try {
-      await deleteDream(dream._id);
-      navigate('/profile');
-    } catch (error) {
-      setActionError(error instanceof Error ? error.message : 'Failed to delete dream');
+  // Jump to the comments when arriving from a card's comment link.
+  useEffect(() => {
+    if (status === 'ready' && window.location.hash === '#comments') {
+      document.getElementById('comments')?.scrollIntoView();
     }
-  };
+  }, [status]);
 
-  if (!dream && status === 'loading') {
-    return <div className="flex justify-center py-16 text-gray-500">Loading...</div>;
-  }
-
-  if (!dream) {
+  if (!dream && status !== 'missing') {
     return (
-      <div className="flex flex-col items-center justify-center h-64">
-        <h2 className="text-xl mb-4">Dream not found</h2>
-        <button
-          onClick={() => navigate(-1)}
-          className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors duration-200"
-        >
-          Go Back
-        </button>
+      <div className="mx-auto max-w-3xl space-y-4" role="status" aria-label="Loading dream">
+        <Skeleton className="h-8 w-24" />
+        <Skeleton className="h-10 w-3/4" />
+        <Skeleton className="h-4 w-1/3" />
+        <Skeleton className="h-40 w-full" />
       </div>
     );
   }
 
-  const isOwnDream = dream.isOwner;
+  if (!dream) {
+    return (
+      <EmptyState
+        icon={<SearchX className="h-12 w-12" />}
+        title="Dream not found"
+        description="It may have been deleted or made private."
+        action={<Button onClick={() => navigate(-1)}>Go back</Button>}
+      />
+    );
+  }
+
+  const handleDelete = async () => {
+    const ok = await confirm({
+      title: 'Delete this dream?',
+      description: 'The dream and all its comments will be permanently removed.',
+      confirmLabel: 'Delete dream',
+      danger: true
+    });
+    if (!ok) return;
+    try {
+      await deleteDream(dream._id);
+      toast.success('Dream deleted');
+      navigate('/profile', { replace: true });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete dream');
+    }
+  };
+
+  const handleLike = async () => {
+    if (!isAuthenticated) {
+      toast.info('Sign in to like dreams');
+      navigate('/auth', { state: { from: `/dream/${dream._id}` } });
+      return;
+    }
+    try {
+      await likeDream(dream._id);
+    } catch {
+      toast.error('Could not update your like. Please try again.');
+    }
+  };
 
   return (
-    <div className={`max-w-3xl mx-auto px-4 py-8 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-      <button
-        onClick={() => navigate(-1)}
-        className={`
-          flex items-center mb-6 px-3 py-1 rounded-md
-          ${isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}
-          transition-colors duration-200
-        `}
-      >
-        <ArrowLeft className="w-5 h-5 mr-1" />
+    <div className="mx-auto max-w-3xl animate-fade-in">
+      <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="-ml-3 mb-4">
+        <ArrowLeft className="h-4 w-4" aria-hidden />
         Back
-      </button>
+      </Button>
 
-      <div className={`
-        rounded-lg overflow-hidden shadow-lg
-        ${isDarkMode ? 'bg-gray-800' : 'bg-white'} 
-        p-6 md:p-8
-      `}>
-        <div className="flex justify-between items-start mb-6">
-          <div className="flex items-center space-x-3">
-            {dream.userId && (
-              <Avatar
-                src={dream.userId.avatarUrl}
-                alt={dream.userName}
-                size="lg"
-              />
+      <Card as="article" className="relative overflow-hidden p-6 sm:p-8">
+        <span className={`absolute inset-x-0 top-0 h-1 ${MOODS[dream.mood].stripe}`} aria-hidden />
+
+        <header className="mb-6">
+          <div className="mb-4 flex flex-wrap gap-2">
+            <MoodBadge mood={dream.mood} />
+            <PrivacyBadge privacy={dream.privacyLevel} />
+          </div>
+          <h1 className="mb-4 font-serif text-3xl font-bold leading-tight">{dream.title}</h1>
+          <div className="flex items-center gap-3">
+            {dream.userId ? (
+              <Link to={`/profile/${dream.userId._id}`} aria-label={`${dream.userName}'s profile`}>
+                <Avatar src={dream.userId.avatarUrl} name={dream.userName} size="md" />
+              </Link>
+            ) : (
+              <Avatar name="Anonymous" size="md" />
             )}
-
-            <div>
-              <h1 className="text-2xl font-serif font-bold">{dream.title}</h1>
-              <div className="flex items-center text-sm text-gray-500 mt-1">
-                <span>{dream.userName}</span>
-                <span className="mx-1">•</span>
-                <span>{formatDate(new Date(dream.createdAt))}</span>
-              </div>
+            <div className="text-sm text-muted">
+              <p className="font-medium text-fg">{dream.userName}</p>
+              <RelativeTime date={dream.createdAt} />
             </div>
           </div>
+        </header>
 
-          <div className="flex space-x-2">
-            <MoodBadge mood={dream.mood} size="md" />
-            <PrivacyBadge privacy={dream.privacyLevel} size="md" />
-          </div>
-        </div>
+        <div className="mb-6 max-w-prose whitespace-pre-line text-lg leading-relaxed">{dream.content}</div>
 
-        <div className="prose max-w-none mb-6 whitespace-pre-line">
-          <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-            {dream.content}
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-2 mb-6">
-          {dream.tags.map(tag => (
-            <TagBadge
-              key={tag}
-              tag={tag}
-              onClick={() => navigate(`/explore?tag=${encodeURIComponent(tag)}`)}
-            />
-          ))}
-        </div>
-
-        {isOwnDream && (
-          <div className="mb-8 flex justify-end gap-2">
-            {actionError && <p role="alert" className="text-red-500 text-sm self-center">{actionError}</p>}
-            <button
-              onClick={handleDelete}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors duration-200"
-            >
-              <Trash2 className="w-5 h-5" />
-              Delete
-            </button>
-            <button
-              onClick={() => navigate(`/dream/${dream._id}/edit`)}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors duration-200"
-            >
-              <Edit className="w-5 h-5" />
-              Edit Dream
-            </button>
+        {dream.tags.length > 0 && (
+          <div className="mb-6 flex flex-wrap gap-2">
+            {dream.tags.map((tag) => (
+              <TagBadge key={tag} tag={tag} />
+            ))}
           </div>
         )}
 
-        <div className="mt-8 pt-8 border-t border-gray-200">
-          <CommentSection dreamId={dream._id} comments={dream.comments} />
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={handleLike}
+              aria-pressed={dream.likedByMe}
+              className={`inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 transition-colors sm:min-h-9 ${
+                dream.likedByMe ? 'text-red-500' : 'text-muted hover:text-red-500'
+              }`}
+            >
+              <Heart className="h-5 w-5" fill={dream.likedByMe ? 'currentColor' : 'none'} aria-hidden />
+              <span className="tabular-nums">{dream.likesCount}</span>
+              <span className="sr-only">likes</span>
+            </button>
+            {dream.privacyLevel !== 'private' && <ShareButton dreamId={dream._id} title={dream.title} withLabel />}
+          </div>
+
+          {dream.isOwner && (
+            <div className="flex gap-2">
+              <ButtonLink to={`/dream/${dream._id}/edit`} variant="secondary" size="sm">
+                <Edit className="h-4 w-4" aria-hidden />
+                Edit
+              </ButtonLink>
+              <Button variant="ghost" size="sm" onClick={handleDelete} className="text-danger-text hover:bg-danger/10">
+                <Trash2 className="h-4 w-4" aria-hidden />
+                Delete
+              </Button>
+            </div>
+          )}
         </div>
-      </div>
+      </Card>
+
+      <Card className="mt-6">
+        <CommentSection dreamId={dream._id} comments={dream.comments} />
+      </Card>
     </div>
   );
 };

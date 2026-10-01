@@ -7,8 +7,8 @@ interface AppContextType {
   userDreams: Dream[];
   publicFeed: Dream[];
   allDreams: Dream[];
-  isDarkMode: boolean;
-  setIsDarkMode: (value: boolean) => void;
+  /** true until the first feed request settles */
+  feedLoading: boolean;
   fetchFeed: (params?: FeedParams) => Promise<FeedPage>;
   fetchDream: (id: string) => Promise<Dream>;
   fetchUserDreams: (userId: string) => Promise<Dream[]>;
@@ -25,33 +25,12 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const THEME_KEY = 'theme';
-
-const readStoredTheme = (): boolean => {
-  try {
-    const stored = localStorage.getItem(THEME_KEY);
-    if (stored) return stored === 'dark';
-  } catch {
-    /* storage unavailable */
-  }
-  return typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches;
-};
-
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const userId = user?._id;
 
   const [dreams, setDreams] = useState<Record<string, Dream>>({});
-  const [isDarkMode, setDarkMode] = useState<boolean>(readStoredTheme);
-
-  const setIsDarkMode = useCallback((value: boolean) => {
-    setDarkMode(value);
-    try {
-      localStorage.setItem(THEME_KEY, value ? 'dark' : 'light');
-    } catch {
-      /* storage unavailable */
-    }
-  }, []);
+  const [feedLoading, setFeedLoading] = useState(true);
 
   const upsert = useCallback((incoming: Dream[]) => {
     setDreams((prev) => {
@@ -93,6 +72,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Reload visible dreams whenever the session changes (likedByMe / ownership depend on the viewer).
   useEffect(() => {
     setDreams({});
+    setFeedLoading(true);
     const controller = new AbortController();
     const load = async () => {
       try {
@@ -104,6 +84,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (userId) upsert(await api<Dream[]>(`/dreams/user/${userId}`, { signal: controller.signal }));
       } catch (error) {
         if (!controller.signal.aborted) console.error('Error fetching dreams:', error);
+      } finally {
+        if (!controller.signal.aborted) setFeedLoading(false);
       }
     };
     load();
@@ -137,9 +119,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   }, []);
 
+  // Optimistic: the heart flips immediately and rolls back if the request fails.
   const likeDream = useCallback(
     async (dreamId: string) => {
-      upsert([await api<Dream>(`/dreams/${dreamId}/like`, { method: 'POST' })]);
+      let previous: Dream | undefined;
+      setDreams((prev) => {
+        previous = prev[dreamId];
+        if (!previous) return prev;
+        const liked = !previous.likedByMe;
+        return {
+          ...prev,
+          [dreamId]: { ...previous, likedByMe: liked, likesCount: previous.likesCount + (liked ? 1 : -1) }
+        };
+      });
+      try {
+        upsert([await api<Dream>(`/dreams/${dreamId}/like`, { method: 'POST' })]);
+      } catch (error) {
+        const original = previous;
+        if (original) upsert([original]);
+        throw error;
+      }
     },
     [upsert]
   );
@@ -179,8 +178,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       allDreams: all,
       userDreams: all.filter((d) => d.isOwner),
       publicFeed: all.filter((d) => d.privacyLevel !== 'private'),
-      isDarkMode,
-      setIsDarkMode,
+      feedLoading,
       fetchFeed,
       fetchDream,
       fetchUserDreams,
@@ -196,8 +194,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [
     dreams,
-    isDarkMode,
-    setIsDarkMode,
+    feedLoading,
     fetchFeed,
     fetchDream,
     fetchUserDreams,

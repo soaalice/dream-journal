@@ -42,10 +42,31 @@
 - Change password and delete account
 - Server unit tests (`npm test`), `typecheck` script
 
+## UX/UI overhaul
+
+Details in [design-system.md](design-system.md).
+
+- Semantic colour tokens plus a `dark` class replace the `isDarkMode ? ... : ...` ternaries; no flash of light theme on load.
+- Reusable primitives: `Button`, `Field`/`Input`/`Textarea`/`PasswordInput`, `Card`, `Modal` (native `<dialog>`),
+  `useConfirm`, `useToast`, `Skeleton`, `EmptyState`, `Avatar` (initials fallback), `Chip`.
+- Layout: new header with active links and a persistent "New dream" button, phone bottom navigation, skip link,
+  back-to-top, scroll restoration, lazy-loaded routes, `RequireAuth` with return-to-where-you-were.
+- Feedback: skeleton loaders, toasts, in-app confirmation dialogs (typed confirmation for account deletion),
+  optimistic likes, error states with Retry.
+- Writing a dream: description first, optional title, mood chips with icons, privacy cards with explanations,
+  tag input with suggestions and counters, autosaved draft and unsaved-changes warning.
+- Reading: dream cards are real links (keyboard, middle-click), 3-line clamp, mood colour accent, exact date in tooltip,
+  working share button (native share or copy link).
+- Explore: filters, search and tab state in the URL, sticky filter bar with result count, infinite scroll.
+- Profile: tab counts and tab kept in the URL, bio, location and website shown.
+- Auth: show/hide password, live password rules, return to the page you came from, welcome panel.
+- First-run welcome card explaining privacy levels; dark-mode atmosphere; accessible labels, `aria-live`,
+  `aria-pressed`, 44 px tap targets, reduced-motion support.
+
 ## Refactoring
 
 - Server: `app.js` factory, `config.js`, `utils/serialize.js`, `utils/validation.js`, central error handling, async handler, indexes.
-- Client: `lib/api.ts` replaces eight copies of fetch + token boilerplate; `AuthContext` split from `AppContext`; memoized context values; `any` removed from date utils.
+- Client: theme split into `ThemeContext`; shared hooks; `lib/moods.tsx` config; `lib/api.ts` replaces eight copies of fetch + token boilerplate; `AuthContext` split from `AppContext`; memoized context values; `any` removed from date utils.
 - Removed dead `mockData.ts` and the self-dependency `"dream-journal": "file:"` in `package.json`.
 - API base URL is configurable through `VITE_API_URL`.
 
