@@ -15,12 +15,21 @@ const userSchema = new mongoose.Schema(
     location: { type: String, default: '', maxlength: 100 },
     website: { type: String, default: '', maxlength: 200 },
     avatarUrl: { type: String, default: DEFAULT_AVATAR, maxlength: 500 },
-    joinedAt: { type: Date, default: Date.now }
+    joinedAt: { type: Date, default: Date.now },
+    /**
+     * Never settable through the public API (profile and registration only pick named fields).
+     * Staff accounts are created from the command line: `npm run make-admin -- someone@example.com` (see scripts/).
+     */
+    role: { type: String, enum: ['user', 'moderator', 'admin'], default: 'user' },
+    /** a suspended account cannot sign in, and its dreams and comments are hidden from everyone */
+    suspendedAt: { type: Date, default: null },
+    suspensionReason: { type: String, default: '', maxlength: 300 }
   },
   { timestamps: true }
 );
 
 userSchema.index({ name: 1 });
+userSchema.index({ suspendedAt: 1 });
 
 userSchema.pre('save', async function hashPassword(next) {
   if (!this.isModified('password')) return next();

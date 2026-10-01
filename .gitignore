@@ -30,3 +30,6 @@ dist-ssr
 !.env.local.example
 
 /docs
+# Generated staff credentials (secrets)
+staff-credentials.md
+*credentials*.md

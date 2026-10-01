@@ -169,7 +169,7 @@ const AuthPage: React.FC = () => {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, notice } = useAuth();
 
   const isLogin = params.get('register') !== 'true';
   useDocumentTitle(isLogin ? 'Sign in' : 'Create account');
@@ -194,6 +194,11 @@ const AuthPage: React.FC = () => {
 
       <Card>
         <h1 className="mb-6 text-center font-serif text-3xl font-bold">{isLogin ? 'Welcome back' : 'Create account'}</h1>
+        {notice && (
+          <p role="alert" className="mb-4 rounded-lg bg-danger/10 px-4 py-3 text-sm text-danger-text">
+            {notice}
+          </p>
+        )}
         {isLogin ? <LoginForm onDone={goBack} /> : <RegisterForm onDone={goBack} />}
         <p className="mt-6 text-center text-sm text-muted">
           {isLogin ? "Don't have an account? " : 'Already have an account? '}

@@ -2,14 +2,20 @@ const API_URL: string = import.meta.env.VITE_API_URL ?? 'http://localhost:5000/a
 
 export class ApiError extends Error {
   status: number;
+  /** machine-readable reason sent by the API, for example "suspended" */
+  code?: string;
+  /** the whole error body, for extra fields such as `reason` */
+  data?: Record<string, unknown>;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, data?: Record<string, unknown>) {
     super(message);
     this.status = status;
+    this.data = data;
+    this.code = typeof data?.code === 'string' ? data.code : undefined;
   }
 }
 
-type UnauthorizedHandler = () => void;
+type UnauthorizedHandler = (error: ApiError) => void;
 let onUnauthorized: UnauthorizedHandler | null = null;
 
 /** Registered by AuthProvider so an expired session logs the user out everywhere. */
@@ -46,8 +52,9 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
   const data = await response.json().catch(() => null);
 
   if (!response.ok) {
-    if (response.status === 401 && !skipAuthHandler) onUnauthorized?.();
-    throw new ApiError(response.status, data?.message ?? 'Request failed');
+    const error = new ApiError(response.status, data?.message ?? 'Request failed', data ?? undefined);
+    if (response.status === 401 && !skipAuthHandler) onUnauthorized?.(error);
+    throw error;
   }
   return data as T;
 }

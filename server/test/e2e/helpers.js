@@ -15,7 +15,9 @@ export const config = {
   clientOrigin: 'http://localhost:5173',
   jwtSecret: 'e2e-secret-'.padEnd(40, 'x'),
   avatarHosts: ['api.dicebear.com'],
-  trustProxy: false
+  trustProxy: false,
+  // tests sign in far more often than a person would; production keeps the default of 20 per 15 minutes
+  authRateLimit: 1000
 };
 
 export const startE2E = async (name) => {
@@ -65,6 +67,7 @@ export const startE2E = async (name) => {
 
   return {
     available: true,
+    baseUrl,
     client,
     signUp,
     stop: async () => {

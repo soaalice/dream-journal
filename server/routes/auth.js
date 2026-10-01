@@ -15,7 +15,7 @@ export default ({ config, schemas, authLimiter }) => {
   const router = express.Router();
 
   const startSession = async (res, user, status = 200) => {
-    setAuthCookie(res, generateToken(user._id, config.jwtSecret), config.isProd);
+    setAuthCookie(res, generateToken(user._id, config.jwtSecret, user.role), config.isProd, user.role);
     res.status(status).json({ user: await serializeUser(user) });
   };
 
@@ -50,6 +50,14 @@ export default ({ config, schemas, authLimiter }) => {
 
       if (!user || !matches) {
         return res.status(401).json({ message: 'Invalid credentials' });
+      }
+      // Only someone who knows the password learns that the account is suspended.
+      if (user.suspendedAt) {
+        return res.status(403).json({
+          message: 'Your account has been suspended',
+          code: 'suspended',
+          reason: user.suspensionReason || undefined
+        });
       }
       await startSession(res, user);
     })

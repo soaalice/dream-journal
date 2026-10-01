@@ -143,6 +143,36 @@ export const buildSchemas = (allowedHosts) => {
       status: z.enum(['published', 'draft']).default('published'),
       privacyLevel: z.enum(PRIVACY_LEVELS).optional()
     }),
+    adminReportsQuery: z.object({
+      page: z.coerce.number().int().min(1).max(10000).default(1),
+      limit: z.coerce.number().int().min(1).max(50).default(15),
+      status: z.enum(['open', 'reviewed', 'dismissed', 'all']).default('open'),
+      type: z.enum(['dream', 'comment']).optional(),
+      reason: z.enum(REPORT_REASONS).optional()
+    }),
+    adminPageQuery: z.object({
+      page: z.coerce.number().int().min(1).max(10000).default(1),
+      limit: z.coerce.number().int().min(1).max(50).default(20)
+    }),
+    adminCaseQuery: z.object({ dreamId: objectId, commentId: objectId.optional() }),
+    adminResolve: z
+      .object({
+        dreamId: objectId,
+        commentId: objectId.optional(),
+        resolution: z.enum(['reviewed', 'dismissed']),
+        removeContent: z.boolean().default(false),
+        suspendAuthor: z.boolean().default(false),
+        suspensionReason: z.string().trim().max(300).default(''),
+        note: z.string().trim().max(500).default('')
+      })
+      .superRefine((v, ctx) => {
+        if (v.resolution === 'dismissed' && (v.removeContent || v.suspendAuthor)) {
+          ctx.addIssue({ code: 'custom', path: ['resolution'], message: 'A dismissed report cannot remove content or suspend anyone' });
+        }
+        if (v.suspendAuthor && v.suspensionReason.length < 3) {
+          ctx.addIssue({ code: 'custom', path: ['suspensionReason'], message: 'Give a reason for the suspension' });
+        }
+      }),
     blocksQuery: z.object({
       limit: z.coerce.number().int().min(1).max(50).default(20),
       before: z.coerce.date().optional()

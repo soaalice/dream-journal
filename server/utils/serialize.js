@@ -129,6 +129,7 @@ export const serializeUser = async (user) => {
     location: user.location,
     website: user.website,
     dreamCount,
-    joinedAt: user.joinedAt
+    joinedAt: user.joinedAt,
+    role: user.role ?? 'user'
   };
 };

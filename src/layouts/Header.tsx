@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { LogIn, LogOut, PenLine } from 'lucide-react';
+import { LogIn, LogOut, PenLine, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/ui/Toast';
 import { ButtonLink, buttonClasses } from '../components/ui/Button';
@@ -44,6 +44,11 @@ const Header: React.FC = () => {
               My dreams
             </NavLink>
           )}
+          {(user?.role === 'admin' || user?.role === 'moderator') && (
+            <NavLink to="/admin" className={navClass}>
+              Moderation
+            </NavLink>
+          )}
         </nav>
 
         <div className="flex items-center gap-1 sm:gap-2">
@@ -53,6 +58,15 @@ const Header: React.FC = () => {
                 <PenLine className="h-4 w-4" aria-hidden />
                 New dream
               </ButtonLink>
+              {(user.role === 'admin' || user.role === 'moderator') && (
+                <Link
+                  to="/admin"
+                  aria-label="Moderation"
+                  className="flex h-11 w-11 items-center justify-center rounded-full text-fg transition-colors hover:bg-surface-2 md:hidden"
+                >
+                  <ShieldCheck className="h-5 w-5" aria-hidden />
+                </Link>
+              )}
               <NotificationBell />
               <ThemeToggle />
               <Link to="/profile" aria-label="Your profile" className="rounded-full">

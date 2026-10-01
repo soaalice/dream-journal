@@ -121,3 +121,38 @@ test('own-dreams query is bounded', () => {
   assert.equal(schemas.mineQuery.safeParse({ limit: '500' }).success, false);
   assert.equal(schemas.mineQuery.safeParse({ status: 'archived' }).success, false);
 });
+
+test('admin resolutions: dismissing cannot remove or suspend, suspending needs a reason', () => {
+  const base = { dreamId: '65f000000000000000000001' };
+  assert.equal(schemas.adminResolve.safeParse({ ...base, resolution: 'dismissed' }).success, true);
+  assert.equal(schemas.adminResolve.safeParse({ ...base, resolution: 'dismissed', removeContent: true }).success, false);
+  assert.equal(schemas.adminResolve.safeParse({ ...base, resolution: 'dismissed', suspendAuthor: true, suspensionReason: 'abuse' }).success, false);
+  assert.equal(schemas.adminResolve.safeParse({ ...base, resolution: 'reviewed', suspendAuthor: true }).success, false);
+  assert.equal(schemas.adminResolve.safeParse({ ...base, resolution: 'reviewed', suspendAuthor: true, suspensionReason: 'abuse' }).success, true);
+  assert.equal(schemas.adminResolve.safeParse({ ...base, resolution: 'reviewed', removeContent: true }).success, true);
+  assert.equal(schemas.adminResolve.safeParse({ ...base, resolution: 'archived' }).success, false);
+  assert.equal(schemas.adminResolve.safeParse({ ...base, resolution: 'reviewed', note: 'x'.repeat(501) }).success, false);
+});
+
+test('admin queries are bounded and typed', () => {
+  assert.equal(schemas.adminReportsQuery.parse({}).status, 'open');
+  assert.equal(schemas.adminReportsQuery.safeParse({ status: 'everything' }).success, false);
+  assert.equal(schemas.adminReportsQuery.safeParse({ limit: '500' }).success, false);
+  assert.equal(schemas.adminReportsQuery.safeParse({ reason: 'boredom' }).success, false);
+  assert.equal(schemas.adminCaseQuery.safeParse({ dreamId: 'nope' }).success, false);
+  assert.equal(schemas.adminCaseQuery.safeParse({ dreamId: '65f000000000000000000001', commentId: '65f000000000000000000002' }).success, true);
+});
+
+test('requireAdmin answers 404 to everyone but administrators', async () => {
+  const { requireAdmin } = await import('../middleware/auth.js');
+  const run = (user) => {
+    let status = 200;
+    let nexted = false;
+    const res = { status: (s) => ((status = s), { json: () => {} }) };
+    requireAdmin({ user }, res, () => (nexted = true));
+    return { status, nexted };
+  };
+  assert.deepEqual(run({ userId: 'a', role: 'admin' }), { status: 200, nexted: true });
+  assert.deepEqual(run({ userId: 'a', role: 'user' }), { status: 404, nexted: false });
+  assert.deepEqual(run(undefined), { status: 404, nexted: false });
+});

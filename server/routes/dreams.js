@@ -9,6 +9,7 @@ import { asyncHandler, HttpError } from '../utils/asyncHandler.js';
 import { blockedIdsFor } from '../utils/blocks.js';
 import { MAX_DRAFTS, MAX_REPLY_DEPTH, objectId, validate } from '../utils/validation.js';
 import { canView, populateDream, serializeDream } from '../utils/serialize.js';
+import { deleteCommentFromDream } from '../services/comments.js';
 import {
   notifyComment,
   notifyLike,
@@ -355,22 +356,7 @@ export default ({ config, schemas, reportLimiter }) => {
         throw new HttpError(403, 'Not allowed to delete this comment');
       }
 
-      const hasReplies = (c) => dream.comments.some((other) => String(other.parentId) === String(c._id));
-      const affected = [commentId];
-
-      if (hasReplies(comment)) {
-        comment.deleted = true;
-        comment.content = '[deleted]';
-        comment.mentions = [];
-      } else {
-        let current = comment;
-        while (current) {
-          const parent = current.parentId ? dream.comments.id(current.parentId) : null;
-          dream.comments.pull(current._id);
-          current = parent && parent.deleted && !hasReplies(parent) ? parent : null;
-          if (current) affected.push(String(current._id));
-        }
-      }
+      const affected = deleteCommentFromDream(dream, commentId);
       await dream.save();
       await removeForComments(affected);
 
@@ -381,8 +367,13 @@ export default ({ config, schemas, reportLimiter }) => {
   // ---------- reports ----------
 
   const createReport = async ({ reporterId, targetType, dream, comment, body }) => {
+    // Keep what was reported, so moderators still have it if the author deletes it afterwards.
+    const snapshot = comment
+      ? { title: '', content: comment.content.slice(0, 2000) }
+      : { title: dream.title, content: dream.content.slice(0, 2000) };
     try {
       await Report.create({
+        snapshot,
         reporterId,
         targetType,
         dreamId: dream._id,

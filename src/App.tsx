@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from 'react';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AppProvider } from './context/AppContext';
@@ -10,6 +10,7 @@ import { ConfirmProvider } from './components/ui/Confirm';
 import { DreamGridSkeleton } from './components/ui/Skeleton';
 import AppLayout from './layouts/AppLayout';
 import RequireAuth from './layouts/RequireAuth';
+import RequireAdmin from './layouts/RequireAdmin';
 
 // Route-level code splitting: each page is its own chunk.
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -23,6 +24,11 @@ const AuthPage = lazy(() => import('./pages/AuthPage'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
 const BlockedUsersPage = lazy(() => import('./pages/BlockedUsersPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'));
+const AdminReportsPage = lazy(() => import('./pages/admin/AdminReportsPage'));
+const AdminCasePage = lazy(() => import('./pages/admin/AdminCasePage'));
+const AdminSuspendedPage = lazy(() => import('./pages/admin/AdminSuspendedPage'));
+const AdminAuditPage = lazy(() => import('./pages/admin/AdminAuditPage'));
 
 const AppRoutes: React.FC = () => {
   const { loading } = useAuth();
@@ -50,6 +56,17 @@ const AppRoutes: React.FC = () => {
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/profile/edit" element={<EditProfilePage />} />
             <Route path="/blocked" element={<BlockedUsersPage />} />
+            <Route element={<RequireAdmin />}>
+              <Route path="/admin" element={<AdminLayout />}>
+                <Route index element={<Navigate to="reports" replace />} />
+                <Route path="reports" element={<AdminReportsPage />} />
+                <Route path="case" element={<AdminCasePage />} />
+                <Route element={<RequireAdmin role="admin" />}>
+                  <Route path="suspended" element={<AdminSuspendedPage />} />
+                  <Route path="audit" element={<AdminAuditPage />} />
+                </Route>
+              </Route>
+            </Route>
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </Route>

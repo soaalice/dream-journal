@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { api } from '../lib/api';
+import { REPORT_REASONS } from '../lib/reports';
 import { ReportReason } from '../types';
 import { Button } from '../components/ui/Button';
 import { useConfirm } from '../components/ui/Confirm';
@@ -19,16 +20,6 @@ interface ModerationContextType {
 }
 
 const ModerationContext = createContext<ModerationContextType | undefined>(undefined);
-
-const REASONS: Array<{ value: ReportReason; label: string; hint: string }> = [
-  { value: 'spam', label: 'Spam or advertising', hint: 'Unwanted promotion or repeated posts' },
-  { value: 'harassment', label: 'Harassment or bullying', hint: 'Targets or attacks a person' },
-  { value: 'hate', label: 'Hate speech', hint: 'Attacks people for who they are' },
-  { value: 'sexual', label: 'Sexual or graphic content', hint: 'Explicit or disturbing material' },
-  { value: 'violence', label: 'Violence or threats', hint: 'Threatens or encourages harm' },
-  { value: 'self_harm', label: 'Self-harm', hint: 'Someone may be at risk' },
-  { value: 'other', label: 'Something else', hint: 'Tell us more below' }
-];
 
 type ReportTarget = { dreamId: string; commentId?: string };
 
@@ -126,7 +117,7 @@ export const ModerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         <fieldset>
           <legend className="mb-3 text-sm text-muted">What is wrong with it? Your report is anonymous to the author.</legend>
           <div className="space-y-2">
-            {REASONS.map((r) => (
+            {REPORT_REASONS.map((r) => (
               <label
                 key={r.value}
                 className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors focus-within:ring-2 focus-within:ring-accent ${

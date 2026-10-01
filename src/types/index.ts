@@ -110,6 +110,8 @@ export interface User {
   website: string;
   dreamCount: number;
   joinedAt: string;
+  /** administrators get the moderation panel; the server re-checks this on every request */
+  role: 'user' | 'moderator' | 'admin';
 }
 
 export interface Comment {
