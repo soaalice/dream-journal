@@ -104,7 +104,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ dreamId, comments }) =>
       <ul className="space-y-4">
         {comments.length > 0 ? (
           comments.map((comment) => (
-            <li key={comment._id} className="flex gap-3">
+            <li key={comment._id} id={`comment-${comment._id}`} className="flex scroll-mt-24 gap-3">
               <Avatar src={comment.userAvatar} name={comment.userName} size="sm" />
               <div className="min-w-0 flex-1 rounded-lg bg-surface-2 p-3">
                 <div className="flex items-center justify-between gap-2 text-sm">

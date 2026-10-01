@@ -7,6 +7,7 @@ import rateLimit from 'express-rate-limit';
 import authRoutes from './routes/auth.js';
 import dreamRoutes from './routes/dreams.js';
 import userRoutes from './routes/users.js';
+import notificationRoutes from './routes/notifications.js';
 import { originGuard } from './middleware/auth.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { buildSchemas } from './utils/validation.js';
@@ -37,6 +38,7 @@ export const createApp = (config) => {
   app.use('/api/auth', authRoutes(deps));
   app.use('/api/dreams', dreamRoutes(deps));
   app.use('/api/users', userRoutes(deps));
+  app.use('/api/notifications', notificationRoutes(deps));
 
   app.use(notFound);
   app.use(errorHandler);

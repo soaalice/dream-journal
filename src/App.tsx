@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AppProvider } from './context/AppContext';
+import { NotificationsProvider } from './context/NotificationsContext';
 import { ToastProvider } from './components/ui/Toast';
 import { ConfirmProvider } from './components/ui/Confirm';
 import { DreamGridSkeleton } from './components/ui/Skeleton';
@@ -18,6 +19,7 @@ const EditDreamPage = lazy(() => import('./pages/EditDreamPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const EditProfilePage = lazy(() => import('./pages/EditProfilePage'));
 const AuthPage = lazy(() => import('./pages/AuthPage'));
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
 const AppRoutes: React.FC = () => {
@@ -42,6 +44,7 @@ const AppRoutes: React.FC = () => {
           <Route element={<RequireAuth />}>
             <Route path="/new" element={<CreateDreamPage />} />
             <Route path="/dream/:id/edit" element={<EditDreamPage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/profile/edit" element={<EditProfilePage />} />
             <Route path="/profile/:id" element={<ProfilePage />} />
@@ -60,9 +63,11 @@ function App() {
         <ConfirmProvider>
           <AuthProvider>
             <AppProvider>
-              <BrowserRouter>
-                <AppRoutes />
-              </BrowserRouter>
+              <NotificationsProvider>
+                <BrowserRouter>
+                  <AppRoutes />
+                </BrowserRouter>
+              </NotificationsProvider>
             </AppProvider>
           </AuthProvider>
         </ConfirmProvider>

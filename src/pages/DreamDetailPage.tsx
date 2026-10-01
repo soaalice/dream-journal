@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Edit, Heart, SearchX, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
@@ -22,6 +22,7 @@ import ShareButton from '../components/dream/ShareButton';
 const DreamDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { hash } = useLocation();
   const toast = useToast();
   const confirm = useConfirm();
   const { isAuthenticated } = useAuth();
@@ -44,12 +45,12 @@ const DreamDetailPage: React.FC = () => {
     };
   }, [id, fetchDream]);
 
-  // Jump to the comments when arriving from a card's comment link.
+  // Jump to the comments, or to one specific comment, when arriving from a card or a notification.
   useEffect(() => {
-    if (status === 'ready' && window.location.hash === '#comments') {
-      document.getElementById('comments')?.scrollIntoView();
+    if (status === 'ready' && hash) {
+      document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'center' });
     }
-  }, [status]);
+  }, [status, hash, dream?.comments.length]);
 
   if (!dream && status !== 'missing') {
     return (

@@ -6,6 +6,7 @@ import { authenticate, clearAuthCookie } from '../middleware/auth.js';
 import { asyncHandler, HttpError } from '../utils/asyncHandler.js';
 import { escapeRegex, objectId, validate } from '../utils/validation.js';
 import { serializeUser } from '../utils/serialize.js';
+import { notifyFollow, removeForUser } from '../services/notifications.js';
 
 export default ({ config, schemas, authLimiter }) => {
   const router = express.Router();
@@ -70,11 +71,13 @@ export default ({ config, schemas, authLimiter }) => {
         throw new HttpError(401, 'Password is incorrect');
       }
 
+      const dreamIds = await Dream.find({ userId }).distinct('_id');
       await Promise.all([
         Dream.deleteMany({ userId }),
         Dream.updateMany({}, { $pull: { likes: userId, comments: { userId }, mentions: userId } }),
         User.updateMany({ following: userId }, { $pull: { following: userId } })
       ]);
+      await removeForUser({ userId, dreamIds });
       await User.deleteOne({ _id: userId });
 
       clearAuthCookie(res, config.isProd);
@@ -106,6 +109,7 @@ export default ({ config, schemas, authLimiter }) => {
         { _id: viewerId },
         already ? { $pull: { following: id } } : { $addToSet: { following: id } }
       );
+      await notifyFollow({ targetId: id, actorId: viewerId, following: !already });
 
       res.json(await serializeUser(target, viewerId));
     })

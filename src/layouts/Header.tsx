@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/ui/Toast';
 import { ButtonLink, buttonClasses } from '../components/ui/Button';
 import ThemeToggle from '../components/ui/ThemeToggle';
+import NotificationBell from '../components/notifications/NotificationBell';
 import Avatar from '../components/ui/Avatar';
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
@@ -52,6 +53,7 @@ const Header: React.FC = () => {
                 <PenLine className="h-4 w-4" aria-hidden />
                 New dream
               </ButtonLink>
+              <NotificationBell />
               <ThemeToggle />
               <Link to="/profile" aria-label="Your profile" className="rounded-full">
                 <Avatar src={user.avatarUrl} name={user.name} size="sm" />

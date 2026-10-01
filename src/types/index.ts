@@ -89,6 +89,21 @@ export interface Comment {
   canDelete: boolean;
 }
 
+export type NotificationType = 'comment' | 'mention' | 'like' | 'follow';
+
+export interface AppNotification {
+  _id: string;
+  type: NotificationType;
+  read: boolean;
+  createdAt: string;
+  /** for likes: how many likes this grouped row stands for */
+  count: number;
+  /** null when the actor is hidden (anonymous author) or no longer exists */
+  actor: DreamAuthor | null;
+  dream: { _id: string; title: string } | null;
+  commentId: string | null;
+}
+
 export interface AuthState {
   isAuthenticated: boolean;
   user: User | null;

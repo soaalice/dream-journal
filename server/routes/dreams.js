@@ -6,6 +6,14 @@ import { authenticate, optionalAuth } from '../middleware/auth.js';
 import { asyncHandler, HttpError } from '../utils/asyncHandler.js';
 import { objectId, validate } from '../utils/validation.js';
 import { canView, populateDream, serializeDream } from '../utils/serialize.js';
+import {
+  notifyComment,
+  notifyLike,
+  notifyMentions,
+  removeForComment,
+  removeForDream,
+  removeForDreamExceptOwner
+} from '../services/notifications.js';
 
 /** Keeps only mention ids that belong to real users. */
 const resolveMentions = async (ids = []) =>
@@ -115,6 +123,7 @@ export default ({ config, schemas }) => {
         userId: req.user.userId,
         mentions: await resolveMentions(data.mentions)
       });
+      await notifyMentions({ dream, actorId: req.user.userId, mentionIds: dream.mentions });
       await respond(res, dream._id, req.user.userId, 201);
     })
   );
@@ -127,10 +136,22 @@ export default ({ config, schemas }) => {
       const dream = await Dream.findOne({ _id: req.params.id, userId: req.user.userId });
       if (!dream) throw new HttpError(404, 'Dream not found');
 
+      const wasPrivate = dream.privacyLevel === 'private';
+      const previousMentions = dream.mentions.map(String);
+
       const { mentions, ...fields } = req.valid.body;
       dream.set(fields);
       if (mentions) dream.mentions = await resolveMentions(mentions);
       await dream.save();
+
+      if (dream.privacyLevel === 'private') {
+        // Nobody but the author may keep notifications about a dream that is no longer visible.
+        await removeForDreamExceptOwner({ dreamId: dream._id, ownerId: dream.userId });
+      } else {
+        // Notify only people who were not already notified, or everyone if the dream just became visible.
+        const toNotify = wasPrivate ? dream.mentions : dream.mentions.filter((id) => !previousMentions.includes(String(id)));
+        await notifyMentions({ dream, actorId: req.user.userId, mentionIds: toNotify });
+      }
 
       await respond(res, dream._id, req.user.userId);
     })
@@ -142,6 +163,7 @@ export default ({ config, schemas }) => {
     asyncHandler(async (req, res) => {
       const dream = await Dream.findOneAndDelete({ _id: req.params.id, userId: req.user.userId });
       if (!dream) throw new HttpError(404, 'Dream not found');
+      await removeForDream(dream._id);
       res.json({ message: 'Dream deleted' });
     })
   );
@@ -155,7 +177,7 @@ export default ({ config, schemas }) => {
       await loadVisible(req.params.id, viewerId);
 
       const uid = new mongoose.Types.ObjectId(viewerId);
-      await Dream.updateOne({ _id: req.params.id }, [
+      const updated = await Dream.findOneAndUpdate({ _id: req.params.id }, [
         {
           $set: {
             likes: {
@@ -167,8 +189,12 @@ export default ({ config, schemas }) => {
             }
           }
         }
-      ]);
+      ], { new: true });
 
+      if (updated) {
+        const liked = updated.likes.some((id) => String(id) === viewerId);
+        await notifyLike({ dream: updated, actorId: viewerId, liked });
+      }
       await respond(res, req.params.id, viewerId);
     })
   );
@@ -179,13 +205,17 @@ export default ({ config, schemas }) => {
     validate(schemas.comment),
     asyncHandler(async (req, res) => {
       const viewerId = req.user.userId;
-      await loadVisible(req.params.id, viewerId);
+      const dream = await loadVisible(req.params.id, viewerId);
 
       const { content, mentions } = req.valid.body;
+      const mentionIds = await resolveMentions(mentions);
+      const commentId = new mongoose.Types.ObjectId();
       await Dream.updateOne(
         { _id: req.params.id },
-        { $push: { comments: { content, userId: viewerId, mentions: await resolveMentions(mentions) } } }
+        { $push: { comments: { _id: commentId, content, userId: viewerId, mentions: mentionIds } } }
       );
+
+      await notifyComment({ dream, actorId: viewerId, commentId, mentionIds });
 
       await respond(res, req.params.id, viewerId, 201);
     })
@@ -209,6 +239,7 @@ export default ({ config, schemas }) => {
       }
 
       await Dream.updateOne({ _id: req.params.id }, { $pull: { comments: { _id: req.params.commentId } } });
+      await removeForComment(req.params.commentId);
       await respond(res, req.params.id, viewerId);
     })
   );
