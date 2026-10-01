@@ -7,11 +7,13 @@ import { useAuth } from '../context/AuthContext';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { ProfileUpdateData } from '../types';
 import AccountSecurity from '../components/AccountSecurity';
+import BlockedPreview from '../components/moderation/BlockedPreview';
 import EmojiAvatarPicker from '../components/EmojiAvatarPicker';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Field, Input, Textarea } from '../components/ui/Field';
 import { useToast } from '../components/ui/Toast';
+import { Page, PageHeader } from '../components/ui/Page';
 
 const profileSchema = z.object({
   name: z.string().trim().min(2, 'Name must be at least 2 characters').max(50, 'Name must be at most 50 characters'),
@@ -62,9 +64,8 @@ const EditProfilePage: React.FC = () => {
   };
 
   return (
-    <div className="mx-auto max-w-2xl animate-fade-in">
-      <h1 className="mb-1 font-serif text-3xl font-bold">Edit profile</h1>
-      <p className="mb-8 text-muted">Update how others see you.</p>
+    <Page width="narrow">
+      <PageHeader title="Edit profile" description="Your name and avatar are shown on the dreams and comments you share publicly." />
 
       <Card>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
@@ -116,8 +117,10 @@ const EditProfilePage: React.FC = () => {
         </form>
       </Card>
 
+      <BlockedPreview />
+
       <AccountSecurity />
-    </div>
+    </Page>
   );
 };
 

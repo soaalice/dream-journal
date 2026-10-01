@@ -1,0 +1,17 @@
+version: 2
+updates:
+  # Security and version updates for npm packages, grouped so they arrive as one pull request a week.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  # Keep the actions used by CI up to date as well.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

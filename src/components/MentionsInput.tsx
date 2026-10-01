@@ -9,6 +9,7 @@ interface MentionsInputProps {
   placeholder?: string;
   rows?: number;
   maxLength?: number;
+  autoFocus?: boolean;
   'aria-label'?: string;
 }
 
@@ -26,6 +27,7 @@ const MentionsInput: React.FC<MentionsInputProps> = ({
   placeholder = '',
   rows = 3,
   maxLength = 1000,
+  autoFocus = false,
   'aria-label': ariaLabel
 }) => {
   const { searchUsers } = useApp();
@@ -107,6 +109,7 @@ const MentionsInput: React.FC<MentionsInputProps> = ({
         placeholder={placeholder}
         rows={rows}
         maxLength={maxLength}
+        autoFocus={autoFocus}
         aria-label={ariaLabel}
         role="combobox"
         aria-expanded={open}

@@ -1,26 +1,39 @@
 import React, { Suspense, lazy } from 'react';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AppProvider } from './context/AppContext';
 import { NotificationsProvider } from './context/NotificationsContext';
+import { ModerationProvider } from './context/ModerationContext';
 import { ToastProvider } from './components/ui/Toast';
 import { ConfirmProvider } from './components/ui/Confirm';
 import { DreamGridSkeleton } from './components/ui/Skeleton';
 import AppLayout from './layouts/AppLayout';
 import RequireAuth from './layouts/RequireAuth';
+import RequireAdmin from './layouts/RequireAdmin';
 
 // Route-level code splitting: each page is its own chunk.
 const HomePage = lazy(() => import('./pages/HomePage'));
 const ExplorePage = lazy(() => import('./pages/ExplorePage'));
 const DreamDetailPage = lazy(() => import('./pages/DreamDetailPage'));
 const CreateDreamPage = lazy(() => import('./pages/CreateDreamPage'));
+const QuickCapturePage = lazy(() => import('./pages/QuickCapturePage'));
+const StatsPage = lazy(() => import('./pages/StatsPage'));
 const EditDreamPage = lazy(() => import('./pages/EditDreamPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const EditProfilePage = lazy(() => import('./pages/EditProfilePage'));
 const AuthPage = lazy(() => import('./pages/AuthPage'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
+const BlockedUsersPage = lazy(() => import('./pages/BlockedUsersPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'));
+const AdminReportsPage = lazy(() => import('./pages/admin/AdminReportsPage'));
+const AdminCasePage = lazy(() => import('./pages/admin/AdminCasePage'));
+const AdminSuspendedPage = lazy(() => import('./pages/admin/AdminSuspendedPage'));
+const AdminAuditPage = lazy(() => import('./pages/admin/AdminAuditPage'));
+const AdminAppealsPage = lazy(() => import('./pages/admin/AdminAppealsPage'));
+const AdminAppealPage = lazy(() => import('./pages/admin/AdminAppealPage'));
+const AdminStaffPage = lazy(() => import('./pages/admin/AdminStaffPage'));
 
 const AppRoutes: React.FC = () => {
   const { loading } = useAuth();
@@ -43,11 +56,27 @@ const AppRoutes: React.FC = () => {
           <Route path="/auth" element={<AuthPage />} />
           <Route element={<RequireAuth />}>
             <Route path="/new" element={<CreateDreamPage />} />
+            <Route path="/capture" element={<QuickCapturePage />} />
+            <Route path="/stats" element={<StatsPage />} />
             <Route path="/dream/:id/edit" element={<EditDreamPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/profile/edit" element={<EditProfilePage />} />
-            <Route path="/profile/:id" element={<ProfilePage />} />
+            <Route path="/blocked" element={<BlockedUsersPage />} />
+            <Route element={<RequireAdmin />}>
+              <Route path="/admin" element={<AdminLayout />}>
+                <Route index element={<Navigate to="reports" replace />} />
+                <Route path="reports" element={<AdminReportsPage />} />
+                <Route path="case" element={<AdminCasePage />} />
+                <Route path="appeals" element={<AdminAppealsPage />} />
+                <Route path="appeals/:id" element={<AdminAppealPage />} />
+                <Route element={<RequireAdmin role="admin" />}>
+                  <Route path="suspended" element={<AdminSuspendedPage />} />
+                  <Route path="staff" element={<AdminStaffPage />} />
+                  <Route path="audit" element={<AdminAuditPage />} />
+                </Route>
+              </Route>
+            </Route>
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </Route>
@@ -64,9 +93,11 @@ function App() {
           <AuthProvider>
             <AppProvider>
               <NotificationsProvider>
-                <BrowserRouter>
-                  <AppRoutes />
-                </BrowserRouter>
+                <ModerationProvider>
+                  <BrowserRouter>
+                    <AppRoutes />
+                  </BrowserRouter>
+                </ModerationProvider>
               </NotificationsProvider>
             </AppProvider>
           </AuthProvider>

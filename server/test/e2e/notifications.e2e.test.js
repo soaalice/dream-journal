@@ -1,96 +1,18 @@
-/**
- * End-to-end test of the notification flow against a real MongoDB.
- * Runs on a throwaway database (dropped at the end), never on your data.
- *
- *   npm run test:e2e                      # uses mongodb://127.0.0.1:27017
- *   MONGODB_TEST_URI=... npm run test:e2e # use another server
- */
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
-import mongoose from 'mongoose';
-import { createApp } from '../../app.js';
 import Notification from '../../models/Notification.js';
+import { dreamBody, inbox, startE2E } from './helpers.js';
 
-const BASE_URI = process.env.MONGODB_TEST_URI || 'mongodb://127.0.0.1:27017';
-const DB_NAME = `dream-journal-e2e-${Date.now()}`;
-
-let server;
-let baseUrl;
-
-const config = {
-  isProd: false,
-  clientOrigin: 'http://localhost:5173',
-  jwtSecret: 'e2e-secret-'.padEnd(40, 'x'),
-  avatarHosts: ['api.dicebear.com'],
-  trustProxy: false
-};
-
-/** Minimal client that keeps the httpOnly session cookie, like a browser would. */
-const client = () => {
-  let cookie = '';
-  const call = async (method, path, body) => {
-    const res = await fetch(`${baseUrl}/api${path}`, {
-      method,
-      headers: { 'Content-Type': 'application/json', Origin: config.clientOrigin, ...(cookie && { Cookie: cookie }) },
-      body: body === undefined ? undefined : JSON.stringify(body)
-    });
-    const set = res.headers.get('set-cookie');
-    if (set) cookie = set.split(';')[0];
-    return { status: res.status, body: await res.json().catch(() => null) };
-  };
-  return {
-    get: (p) => call('GET', p),
-    post: (p, b) => call('POST', p, b ?? {}),
-    del: (p, b) => call('DELETE', p, b),
-    put: (p, b) => call('PUT', p, b)
-  };
-};
-
-const signUp = async (name) => {
-  const c = client();
-  const res = await c.post('/auth/register', { name, email: `${name.toLowerCase()}@example.com`, password: 'password123' });
-  assert.equal(res.status, 201, `register ${name}`);
-  return { c, id: res.body.user._id, name };
-};
-
-const dreamBody = (privacyLevel, extra = {}) => ({
-  title: 'Flying over the sea',
-  content: 'I was flying over a very calm sea.',
-  privacyLevel,
-  mood: 'peaceful',
-  tags: ['sea'],
-  ...extra
-});
-
-const inbox = async (user) => (await user.c.get('/notifications')).body;
-
-let mongoUp = true;
-
+let env;
 before(async () => {
-  try {
-    await mongoose.connect(BASE_URI, { dbName: DB_NAME, serverSelectionTimeoutMS: 2000 });
-    await mongoose.connection.syncIndexes?.();
-    await Promise.all(Object.values(mongoose.models).map((m) => m.syncIndexes()));
-  } catch {
-    mongoUp = false;
-    return;
-  }
-  server = createApp(config).listen(0);
-  await new Promise((resolve) => server.once('listening', resolve));
-  baseUrl = `http://127.0.0.1:${server.address().port}`;
+  env = await startE2E('notifications');
 });
-
-after(async () => {
-  server?.close();
-  if (mongoUp) {
-    await mongoose.connection.dropDatabase();
-    await mongoose.disconnect();
-  }
-});
+after(async () => env?.stop());
 
 test('notification flow', async (t) => {
-  if (!mongoUp) return t.skip('MongoDB is not reachable');
+  if (!env.available) return t.skip('MongoDB is not reachable');
 
+  const { signUp } = env;
   const alice = await signUp('Alice');
   const bob = await signUp('Bobby');
   const cara = await signUp('Carla');
@@ -141,13 +63,6 @@ test('notification flow', async (t) => {
     // Alice never notifies herself
     await alice.c.post(`/dreams/${dream._id}/like`);
     assert.equal((await inbox(alice)).notifications.filter((n) => n.type === 'like').length, 0);
-  });
-
-  await t.test('follow and unfollow', async () => {
-    await cara.c.post(`/users/${alice.id}/follow`);
-    assert.ok((await inbox(alice)).notifications.some((n) => n.type === 'follow' && n.actor.name === 'Carla'));
-    await cara.c.post(`/users/${alice.id}/follow`);
-    assert.equal((await inbox(alice)).notifications.some((n) => n.type === 'follow'), false);
   });
 
   await t.test('read state, mark all, dismiss, and ownership', async () => {
@@ -226,7 +141,7 @@ test('notification flow', async (t) => {
   });
 
   await t.test('endpoints require a session', async () => {
-    const anonymous = client();
+    const anonymous = env.client();
     assert.equal((await anonymous.get('/notifications')).status, 401);
     assert.equal((await anonymous.get('/notifications/unread-count')).status, 401);
     assert.equal((await anonymous.post('/notifications/read')).status, 401);

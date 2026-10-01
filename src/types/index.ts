@@ -26,13 +26,28 @@ export interface Dream {
   userId: DreamAuthor | null;
   userName: string;
   isOwner: boolean;
+  /** drafts are visible to their author only */
+  status: DreamStatus;
+  /** set only for the author when moderators hid or removed the dream */
+  moderation: ModerationInfo | null;
   privacyLevel: PrivacyLevel;
   tags: string[];
   mood: DreamMood;
   likesCount: number;
   likedByMe: boolean;
+  /** comments that are shown (placeholders for deleted/hidden ones are not counted) */
+  commentsCount: number;
+  /** flat list; use `parentId` to build the thread */
   comments: Comment[];
   mentions: string[];
+}
+
+export type DreamStatus = 'draft' | 'published';
+
+export interface ModerationInfo {
+  /** hidden = automatically, waiting for a moderator; removed = a moderator's decision */
+  state: 'hidden' | 'removed';
+  message: string;
 }
 
 export interface DreamInput {
@@ -42,6 +57,36 @@ export interface DreamInput {
   tags: string[];
   mood: DreamMood;
   mentions?: string[];
+  /** defaults to published */
+  status?: DreamStatus;
+}
+
+export interface MyDreamsParams {
+  page?: number;
+  limit?: number;
+  status?: DreamStatus;
+  privacyLevel?: PrivacyLevel;
+}
+
+export interface MyDreamsPage extends FeedPage {
+  counts: Record<'all' | PrivacyLevel | 'draft', number>;
+}
+
+export type ReportReason = 'spam' | 'harassment' | 'hate' | 'sexual' | 'violence' | 'self_harm' | 'other';
+
+export interface BlockedUser {
+  _id: string;
+  createdAt: string;
+  /** true when the block was made from anonymous content: no name or avatar is known */
+  anonymous: boolean;
+  user: { name: string; avatarUrl: string } | null;
+}
+
+export interface BlocksPage {
+  blocks: BlockedUser[];
+  total: number;
+  hasMore: boolean;
+  nextCursor: string | null;
 }
 
 export interface FeedParams {
@@ -72,14 +117,15 @@ export interface User {
   location: string;
   website: string;
   dreamCount: number;
-  followersCount: number;
-  followingCount: number;
-  isFollowing?: boolean;
   joinedAt: string;
+  /** administrators get the moderation panel; the server re-checks this on every request */
+  role: 'user' | 'moderator' | 'admin';
 }
 
 export interface Comment {
   _id: string;
+  /** the comment this one replies to, null for top-level comments */
+  parentId: string | null;
   content: string;
   userId: string | null;
   userName: string;
@@ -87,9 +133,29 @@ export interface Comment {
   createdAt: string;
   mentions: string[];
   canDelete: boolean;
+  /** written by the signed-in user */
+  isOwn: boolean;
+  /** an empty placeholder kept because replies still hang under it (deleted, or by someone you blocked) */
+  deleted: boolean;
+  /** set only for the author when moderators hid or removed their comment */
+  moderation: ModerationInfo | null;
 }
 
-export type NotificationType = 'comment' | 'mention' | 'like' | 'follow';
+export type NotificationType = 'comment' | 'reply' | 'mention' | 'like' | 'moderation' | 'appeal';
+
+export type ModerationEvent = 'removed' | 'hidden' | 'restored' | 'appeal_upheld' | 'appeal_overturned';
+
+/** What moderators did with the person's content; carries its own copy of the text. */
+export interface ModerationNotice {
+  event: ModerationEvent;
+  kind: 'dream' | 'comment';
+  title: string;
+  excerpt: string;
+  message: string;
+  reasons: ReportReason[];
+  appeal: { status: 'open' | 'upheld' | 'overturned' } | null;
+  canAppeal: boolean;
+}
 
 export interface AppNotification {
   _id: string;
@@ -102,6 +168,17 @@ export interface AppNotification {
   actor: DreamAuthor | null;
   dream: { _id: string; title: string } | null;
   commentId: string | null;
+  /** present when type is `moderation` */
+  moderation?: ModerationNotice;
+  /** present when type is `appeal` (staff only) */
+  appeal?: {
+    _id: string;
+    targetType: 'dream' | 'comment' | 'account';
+    title: string;
+    excerpt: string;
+    authorName: string;
+    status: 'open' | 'upheld' | 'overturned';
+  };
 }
 
 export interface AuthState {

@@ -12,6 +12,8 @@ export default {
       fontFamily: {
         sans: ['Inter', 'sans-serif'],
         serif: ['Playfair Display', 'serif'],
+        // the face dreams are read in: made for long text, unlike the display serif used for headings
+        reading: ['"Source Serif 4"', 'Georgia', 'serif'],
       },
       colors: {
         canvas: token('canvas'),
@@ -27,6 +29,8 @@ export default {
         danger: token('danger'),
         'danger-text': token('danger-text'),
         success: token('success-text'),
+        highlight: token('highlight'),
+        'highlight-soft': token('highlight-soft'),
         purple: {
           50: '#f5f3ff',
           100: '#ede9fe',

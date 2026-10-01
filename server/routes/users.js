@@ -1,28 +1,33 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
-import User from '../models/User.js';
+import Block from '../models/Block.js';
 import Dream from '../models/Dream.js';
+import Report from '../models/Report.js';
+import User from '../models/User.js';
 import { authenticate, clearAuthCookie } from '../middleware/auth.js';
 import { asyncHandler, HttpError } from '../utils/asyncHandler.js';
-import { escapeRegex, objectId, validate } from '../utils/validation.js';
+import { blockedIdsFor } from '../utils/blocks.js';
+import { escapeRegex, validate } from '../utils/validation.js';
 import { serializeUser } from '../utils/serialize.js';
-import { notifyFollow, removeForUser } from '../services/notifications.js';
+import { removeForUser } from '../services/notifications.js';
 
+/**
+ * Account endpoints. There are deliberately no endpoints to look at another user's profile: people interact
+ * through dreams and comments, they do not browse each other.
+ */
 export default ({ config, schemas, authLimiter }) => {
   const router = express.Router();
   router.use(authenticate(config.jwtSecret));
 
-  router.param('id', (req, res, next, value) =>
-    objectId.safeParse(value).success ? next() : res.status(400).json({ message: 'Invalid id' })
-  );
-
-  // Autocomplete for @mentions. Matches on name only (never email) and is capped.
+  // Autocomplete for @mentions. Matches on name only (never email), is capped, and leaves out yourself and
+  // anyone you are blocked with.
   router.get(
     '/search',
     validate(schemas.searchQuery, 'query'),
     asyncHandler(async (req, res) => {
       const { q } = req.valid.query;
-      const users = await User.find({ name: { $regex: escapeRegex(q), $options: 'i' } })
+      const exclude = [...(await blockedIdsFor(req.user.userId)), req.user.userId];
+      const users = await User.find({ name: { $regex: escapeRegex(q), $options: 'i' }, _id: { $nin: exclude } })
         .select('name avatarUrl')
         .limit(10);
       res.json(users.map((u) => ({ _id: String(u._id), name: u.name, avatarUrl: u.avatarUrl })));
@@ -39,7 +44,7 @@ export default ({ config, schemas, authLimiter }) => {
         new: true,
         runValidators: true
       });
-      res.json(await serializeUser(user, req.user.userId));
+      res.json(await serializeUser(user));
     })
   );
 
@@ -74,44 +79,22 @@ export default ({ config, schemas, authLimiter }) => {
       const dreamIds = await Dream.find({ userId }).distinct('_id');
       await Promise.all([
         Dream.deleteMany({ userId }),
-        Dream.updateMany({}, { $pull: { likes: userId, comments: { userId }, mentions: userId } }),
-        User.updateMany({ following: userId }, { $pull: { following: userId } })
+        // Their comments become deleted placeholders (so replies from other people keep their context),
+        // and their likes and mentions disappear.
+        Dream.updateMany(
+          { 'comments.userId': userId },
+          { $set: { 'comments.$[c].deleted': true, 'comments.$[c].content': '[deleted]', 'comments.$[c].mentions': [] } },
+          { arrayFilters: [{ 'c.userId': userId }] }
+        ),
+        Dream.updateMany({}, { $pull: { likes: userId, mentions: userId, 'comments.$[].mentions': userId } }),
+        Block.deleteMany({ $or: [{ blockerId: userId }, { blockedId: userId }] }),
+        Report.deleteMany({ reporterId: userId })
       ]);
       await removeForUser({ userId, dreamIds });
       await User.deleteOne({ _id: userId });
 
       clearAuthCookie(res, config.isProd);
       res.json({ message: 'Account deleted' });
-    })
-  );
-
-  router.get(
-    '/:id',
-    asyncHandler(async (req, res) => {
-      const user = await User.findById(req.params.id);
-      if (!user) throw new HttpError(404, 'User not found');
-      res.json(await serializeUser(user, req.user.userId));
-    })
-  );
-
-  router.post(
-    '/:id/follow',
-    asyncHandler(async (req, res) => {
-      const { id } = req.params;
-      const viewerId = req.user.userId;
-      if (id === viewerId) throw new HttpError(400, 'You cannot follow yourself');
-
-      const target = await User.findById(id);
-      if (!target) throw new HttpError(404, 'User not found');
-
-      const already = await User.exists({ _id: viewerId, following: id });
-      await User.updateOne(
-        { _id: viewerId },
-        already ? { $pull: { following: id } } : { $addToSet: { following: id } }
-      );
-      await notifyFollow({ targetId: id, actorId: viewerId, following: !already });
-
-      res.json(await serializeUser(target, viewerId));
     })
   );
 

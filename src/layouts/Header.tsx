@@ -1,35 +1,30 @@
 import React from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { LogIn, LogOut, PenLine } from 'lucide-react';
+import { Link, NavLink } from 'react-router-dom';
+import { LogIn, Moon, PenLine } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useToast } from '../components/ui/Toast';
 import { ButtonLink, buttonClasses } from '../components/ui/Button';
 import ThemeToggle from '../components/ui/ThemeToggle';
 import NotificationBell from '../components/notifications/NotificationBell';
-import Avatar from '../components/ui/Avatar';
+import UserMenu from './UserMenu';
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
   `rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-    isActive ? 'bg-accent-soft text-accent-text' : 'text-fg hover:bg-surface-2'
+    isActive ? 'bg-accent-soft text-accent-text' : 'text-muted hover:bg-surface-2 hover:text-fg'
   }`;
 
-/** Top bar. On small screens navigation lives in BottomNav, so this stays compact. */
+/** Top bar. On small screens navigation lives in BottomNav and the account menu, so this stays compact. */
 const Header: React.FC = () => {
-  const navigate = useNavigate();
-  const toast = useToast();
-  const { user, isAuthenticated, logout } = useAuth();
-
-  const handleLogout = async () => {
-    await logout();
-    toast.info('You have been signed out');
-    navigate('/');
-  };
+  const { user, isAuthenticated } = useAuth();
+  const staff = user?.role === 'admin' || user?.role === 'moderator';
 
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-surface/85 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Link to="/" className="font-serif text-xl font-bold">
-          <span className="bg-gradient-to-r from-purple-600 to-blue-500 bg-clip-text text-transparent">DreamJournal</span>
+        <Link to="/" className="flex items-center gap-2.5" aria-label="Dream Journal, home">
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-purple-600 to-blue-500 text-white shadow-card">
+            <Moon className="h-4 w-4" aria-hidden />
+          </span>
+          <span className="font-serif text-xl font-bold tracking-tight">Dream Journal</span>
         </Link>
 
         <nav aria-label="Main" className="hidden items-center gap-1 md:flex">
@@ -40,8 +35,18 @@ const Header: React.FC = () => {
             Explore
           </NavLink>
           {isAuthenticated && (
-            <NavLink to="/profile" end className={navClass}>
-              My dreams
+            <>
+              <NavLink to="/profile" end className={navClass}>
+                My dreams
+              </NavLink>
+              <NavLink to="/stats" className={navClass}>
+                Insights
+              </NavLink>
+            </>
+          )}
+          {staff && (
+            <NavLink to="/admin" className={navClass}>
+              Moderation
             </NavLink>
           )}
         </nav>
@@ -49,23 +54,13 @@ const Header: React.FC = () => {
         <div className="flex items-center gap-1 sm:gap-2">
           {isAuthenticated && user ? (
             <>
-              <ButtonLink to="/new" size="md" className="hidden md:inline-flex">
+              <ButtonLink to="/new" className="mr-1 hidden md:inline-flex">
                 <PenLine className="h-4 w-4" aria-hidden />
                 New dream
               </ButtonLink>
               <NotificationBell />
               <ThemeToggle />
-              <Link to="/profile" aria-label="Your profile" className="rounded-full">
-                <Avatar src={user.avatarUrl} name={user.name} size="sm" />
-              </Link>
-              <button
-                type="button"
-                onClick={handleLogout}
-                aria-label="Sign out"
-                className="hidden h-10 w-10 items-center justify-center rounded-full text-muted hover:bg-surface-2 hover:text-fg md:flex"
-              >
-                <LogOut className="h-5 w-5" />
-              </button>
+              <UserMenu />
             </>
           ) : (
             <>

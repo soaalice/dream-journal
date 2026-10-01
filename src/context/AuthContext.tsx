@@ -7,6 +7,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   loading: boolean;
   error: string | null;
+  /** explains why the session ended without the user asking (for example a suspension) */
+  notice: string | null;
   login: (credentials: LoginCredentials) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
@@ -28,6 +30,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -41,7 +44,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
-    setUnauthorizedHandler(() => setUser(null));
+    setUnauthorizedHandler((err) => {
+      setUser(null);
+      if (err.code === 'suspended') setNotice('Your account has been suspended.');
+    });
     return () => setUnauthorizedHandler(null);
   }, []);
 
@@ -51,9 +57,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const data = await api<{ user: User }>(path, { method: 'POST', body, skipAuthHandler: true });
         setUser(data.user);
         setError(null);
+        setNotice(null);
       } catch (err) {
-        setError(messageOf(err, fallback));
-        throw err;
+        // A suspension comes with the moderator's reason; show it where the login form reads the error from.
+        const reason = err instanceof ApiError && typeof err.data?.reason === 'string' ? `: ${err.data.reason}` : '';
+        const message = messageOf(err, fallback) + reason;
+        setError(message);
+        throw err instanceof ApiError ? new ApiError(err.status, message, err.data) : err;
       }
     },
     []
@@ -99,6 +109,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isAuthenticated: user !== null,
       loading,
       error,
+      notice,
       login,
       register,
       logout,
@@ -106,7 +117,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       changePassword,
       deleteAccount
     }),
-    [user, loading, error, login, register, logout, updateProfile, changePassword, deleteAccount]
+    [user, loading, error, notice, login, register, logout, updateProfile, changePassword, deleteAccount]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
