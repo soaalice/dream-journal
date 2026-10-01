@@ -86,3 +86,38 @@ test('originGuard blocks cross-origin state changes only', () => {
   assert.equal(run('POST', 'http://localhost:5173').nexted, true);
   assert.equal(run('GET', 'https://evil.example').nexted, true);
 });
+
+test('drafts only need some text; published dreams must be complete', () => {
+  const draft = schemas.dreamCreate.parse({ status: 'draft', content: 'x' });
+  assert.equal(draft.privacyLevel, 'private');
+  assert.equal(draft.mood, 'peaceful');
+  assert.equal(draft.title, '');
+  assert.equal(schemas.dreamCreate.safeParse({ status: 'draft', content: '' }).success, false);
+
+  // no status means published, which needs the full set of fields
+  assert.equal(schemas.dreamCreate.safeParse({ content: 'short' }).success, false);
+  const published = schemas.dreamCreate.parse({ title: 'T', content: 'long enough content', privacyLevel: 'public', mood: 'happy' });
+  assert.equal(published.status, 'published');
+  assert.equal(schemas.dreamCreate.safeParse({ status: 'archived', content: 'long enough content' }).success, false);
+});
+
+test('updates may change the status but a published check is separate', () => {
+  assert.equal(schemas.dreamUpdate.safeParse({ status: 'published' }).success, true);
+  assert.equal(schemas.dreamUpdate.safeParse({}).success, false);
+  assert.equal(schemas.dreamPublished.safeParse({ title: '', content: 'long enough content', privacyLevel: 'public', mood: 'happy' }).success, false);
+});
+
+test('comments accept a parent id, reports need a known reason', () => {
+  const parentId = '65f000000000000000000001';
+  assert.equal(schemas.comment.parse({ content: 'hi', parentId }).parentId, parentId);
+  assert.equal(schemas.comment.safeParse({ content: 'hi', parentId: 'nope' }).success, false);
+  assert.equal(schemas.report.safeParse({ reason: 'spam' }).success, true);
+  assert.equal(schemas.report.safeParse({ reason: 'because' }).success, false);
+  assert.equal(schemas.report.safeParse({ reason: 'other', details: 'x'.repeat(501) }).success, false);
+});
+
+test('own-dreams query is bounded', () => {
+  assert.equal(schemas.mineQuery.parse({}).status, 'published');
+  assert.equal(schemas.mineQuery.safeParse({ limit: '500' }).success, false);
+  assert.equal(schemas.mineQuery.safeParse({ status: 'archived' }).success, false);
+});

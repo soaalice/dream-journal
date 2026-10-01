@@ -54,12 +54,14 @@ const EditDreamPage: React.FC = () => {
 
   return (
     <div className="mx-auto max-w-2xl animate-fade-in">
-      <h1 className="mb-8 font-serif text-3xl font-bold">Edit dream</h1>
+      <h1 className="mb-8 font-serif text-3xl font-bold">{dream.status === 'draft' ? 'Continue your draft' : 'Edit dream'}</h1>
       <DreamForm
         editMode
         dreamId={dream._id}
+        initialStatus={dream.status}
         initialData={{
-          title: dream.title,
+          // the server's placeholder for drafts without a title is not something the user typed
+          title: dream.status === 'draft' && dream.title === 'Untitled draft' ? '' : dream.title,
           content: dream.content,
           privacyLevel: dream.privacyLevel,
           tags: dream.tags,

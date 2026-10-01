@@ -15,15 +15,12 @@ const userSchema = new mongoose.Schema(
     location: { type: String, default: '', maxlength: 100 },
     website: { type: String, default: '', maxlength: 200 },
     avatarUrl: { type: String, default: DEFAULT_AVATAR, maxlength: 500 },
-    // Users this user follows. Follower/following/dream counts are computed, never stored.
-    following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     joinedAt: { type: Date, default: Date.now }
   },
   { timestamps: true }
 );
 
 userSchema.index({ name: 1 });
-userSchema.index({ following: 1 });
 
 userSchema.pre('save', async function hashPassword(next) {
   if (!this.isModified('password')) return next();

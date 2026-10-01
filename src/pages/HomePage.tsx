@@ -65,7 +65,7 @@ const HomePage: React.FC = () => {
   };
 
   // Logged out: always explain the product. Logged in: only until the first dream.
-  const showWelcome = !welcomeDismissed && (!user || (!feedLoading && userDreams.length === 0));
+  const showWelcome = !welcomeDismissed && (!user || (!feedLoading && userDreams.length === 0 && user.dreamCount === 0));
 
   return (
     <div className="animate-fade-in">

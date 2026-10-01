@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { ProfileUpdateData } from '../types';
 import AccountSecurity from '../components/AccountSecurity';
+import BlockedPreview from '../components/moderation/BlockedPreview';
 import EmojiAvatarPicker from '../components/EmojiAvatarPicker';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -64,7 +65,7 @@ const EditProfilePage: React.FC = () => {
   return (
     <div className="mx-auto max-w-2xl animate-fade-in">
       <h1 className="mb-1 font-serif text-3xl font-bold">Edit profile</h1>
-      <p className="mb-8 text-muted">Update how others see you.</p>
+      <p className="mb-8 text-muted">Your name and avatar are shown on the dreams and comments you share publicly.</p>
 
       <Card>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
@@ -115,6 +116,8 @@ const EditProfilePage: React.FC = () => {
           </div>
         </form>
       </Card>
+
+      <BlockedPreview />
 
       <AccountSecurity />
     </div>

@@ -4,6 +4,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AppProvider } from './context/AppContext';
 import { NotificationsProvider } from './context/NotificationsContext';
+import { ModerationProvider } from './context/ModerationContext';
 import { ToastProvider } from './components/ui/Toast';
 import { ConfirmProvider } from './components/ui/Confirm';
 import { DreamGridSkeleton } from './components/ui/Skeleton';
@@ -20,6 +21,7 @@ const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const EditProfilePage = lazy(() => import('./pages/EditProfilePage'));
 const AuthPage = lazy(() => import('./pages/AuthPage'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
+const BlockedUsersPage = lazy(() => import('./pages/BlockedUsersPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
 const AppRoutes: React.FC = () => {
@@ -47,7 +49,7 @@ const AppRoutes: React.FC = () => {
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/profile/edit" element={<EditProfilePage />} />
-            <Route path="/profile/:id" element={<ProfilePage />} />
+            <Route path="/blocked" element={<BlockedUsersPage />} />
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </Route>
@@ -64,9 +66,11 @@ function App() {
           <AuthProvider>
             <AppProvider>
               <NotificationsProvider>
-                <BrowserRouter>
-                  <AppRoutes />
-                </BrowserRouter>
+                <ModerationProvider>
+                  <BrowserRouter>
+                    <AppRoutes />
+                  </BrowserRouter>
+                </ModerationProvider>
               </NotificationsProvider>
             </AppProvider>
           </AuthProvider>

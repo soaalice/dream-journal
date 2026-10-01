@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Edit, Heart, SearchX, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
@@ -16,6 +16,7 @@ import MoodBadge from '../components/ui/MoodBadge';
 import PrivacyBadge from '../components/ui/PrivacyBadge';
 import TagBadge from '../components/ui/TagBadge';
 import CommentSection from '../components/CommentSection';
+import ContentMenu from '../components/moderation/ContentMenu';
 import RelativeTime from '../components/dream/RelativeTime';
 import ShareButton from '../components/dream/ShareButton';
 
@@ -63,22 +64,49 @@ const DreamDetailPage: React.FC = () => {
     );
   }
 
+  // A draft is a work in progress: the editor is its only page.
+  if (dream?.status === 'draft') return <Navigate to={`/dream/${dream._id}/edit`} replace />;
+
   if (!dream) {
     return (
-      <div className="flex flex-col items-center justify-center h-64">
-        <h2 className="text-xl mb-4">Dream not found</h2>
-        <button
-          onClick={() => navigate(-1)}
-          className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors duration-200"
-        >
-          Go Back
-        </button>
-      </div>
+      <EmptyState
+        icon={<SearchX className="h-12 w-12" />}
+        title="Dream not found"
+        description="It may have been deleted or made private."
+        action={<Button onClick={() => navigate(-1)}>Go back</Button>}
+      />
     );
   }
 
-  const isOwnDream = user?.id === dream.userId._id;
-  const isAnonymous = dream.privacyLevel === 'anonymous';
+  const handleDelete = async () => {
+    const ok = await confirm({
+      title: 'Delete this dream?',
+      description: 'The dream and all its comments will be permanently removed.',
+      confirmLabel: 'Delete dream',
+      danger: true
+    });
+    if (!ok) return;
+    try {
+      await deleteDream(dream._id);
+      toast.success('Dream deleted');
+      navigate('/profile', { replace: true });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete dream');
+    }
+  };
+
+  const handleLike = async () => {
+    if (!isAuthenticated) {
+      toast.info('Sign in to like dreams');
+      navigate('/auth', { state: { from: `/dream/${dream._id}` } });
+      return;
+    }
+    try {
+      await likeDream(dream._id);
+    } catch {
+      toast.error('Could not update your like. Please try again.');
+    }
+  };
 
   return (
     <div className="mx-auto max-w-3xl animate-fade-in">
@@ -87,30 +115,25 @@ const DreamDetailPage: React.FC = () => {
         Back
       </Button>
 
-      <div className={`
-        rounded-lg overflow-hidden shadow-lg
-        ${isDarkMode ? 'bg-gray-800' : 'bg-white'} 
-        p-6 md:p-8
-      `}>
-        <div className="flex justify-between items-start mb-6">
-          <div className="flex items-center space-x-3">
-            {!isAnonymous && (
-              <Avatar
-                src={dream.userId.avatarUrl}
-                alt={dream.userName}
-                size="lg"
-              />
-            )}
+      <Card as="article" className="relative overflow-hidden p-6 sm:p-8">
+        <span className={`absolute inset-x-0 top-0 h-1 ${MOODS[dream.mood].stripe}`} aria-hidden />
 
-            <div>
-              <h1 className="text-2xl font-serif font-bold">{dream.title}</h1>
-              <div className="flex items-center text-sm text-gray-500 mt-1">
-                <span>
-                  {isAnonymous ? 'Anonymous' : dream.userName}
-                </span>
-                <span className="mx-1">•</span>
-                <span>{formatDate(new Date(dream.createdAt))}</span>
-              </div>
+        <header className="mb-6">
+          <div className="mb-4 flex items-start justify-between gap-2">
+            <div className="flex flex-wrap gap-2">
+              <MoodBadge mood={dream.mood} />
+              <PrivacyBadge privacy={dream.privacyLevel} />
+            </div>
+            {isAuthenticated && !dream.isOwner && (
+              <ContentMenu kind="dream" dreamId={dream._id} className="-mr-2 -mt-2" onBlocked={() => navigate('/', { replace: true })} />
+            )}
+          </div>
+          <h1 className="mb-4 font-serif text-3xl font-bold leading-tight">{dream.title}</h1>
+          <div className="flex items-center gap-3">
+            <Avatar src={dream.userId?.avatarUrl} name={dream.userId ? dream.userName : 'Anonymous'} size="md" />
+            <div className="text-sm text-muted">
+              <p className="font-medium text-fg">{dream.userName}</p>
+              <RelativeTime date={dream.createdAt} />
             </div>
           </div>
         </header>

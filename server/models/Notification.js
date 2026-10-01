@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const { ObjectId } = mongoose.Schema.Types;
 
-export const NOTIFICATION_TYPES = ['comment', 'mention', 'like', 'follow'];
+export const NOTIFICATION_TYPES = ['comment', 'reply', 'mention', 'like'];
 
 const NINETY_DAYS = 90 * 24 * 60 * 60;
 
@@ -29,8 +29,7 @@ notificationSchema.index({ userId: 1, updatedAt: -1 });
 notificationSchema.index({ userId: 1, readAt: 1 });
 // Old notifications disappear on their own.
 notificationSchema.index({ updatedAt: 1 }, { expireAfterSeconds: NINETY_DAYS });
-// One grouped row per dream for likes, one row per follower for follows (makes upserts race-safe).
+// One grouped row per dream for likes (makes the upsert race-safe).
 notificationSchema.index({ userId: 1, dreamId: 1 }, { unique: true, partialFilterExpression: { type: 'like' } });
-notificationSchema.index({ userId: 1, actorId: 1 }, { unique: true, partialFilterExpression: { type: 'follow' } });
 
 export default mongoose.model('Notification', notificationSchema);

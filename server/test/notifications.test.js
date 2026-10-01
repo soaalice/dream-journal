@@ -1,13 +1,7 @@
 import test, { afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import Notification from '../models/Notification.js';
-import {
-  notifyComment,
-  notifyFollow,
-  notifyLike,
-  notifyMentions,
-  removeForUser
-} from '../services/notifications.js';
+import { notifyComment, notifyLike, notifyMentions, removeForUser } from '../services/notifications.js';
 import { serializeNotification } from '../utils/serializeNotification.js';
 
 const OWNER = '65f000000000000000000001';
@@ -53,14 +47,13 @@ test('nobody is notified about their own actions', async () => {
 test('a comment notifies the owner once, and a mention replaces the plain comment notice', async () => {
   let calls = spy();
   await notifyComment({ dream: dream('public'), actorId: ALICE, commentId: COMMENT_ID, mentionIds: [] });
-  assert.equal(calls.create.length, 1);
-  assert.equal(calls.create[0][0].userId, OWNER);
-  assert.equal(calls.create[0][0].type, 'comment');
+  assert.equal(calls.insertMany.length, 1);
+  assert.deepEqual(calls.insertMany[0][0].map((n) => [n.userId, n.type]), [[OWNER, 'comment']]);
 
   mock.restoreAll();
   calls = spy();
   await notifyComment({ dream: dream('public'), actorId: ALICE, commentId: COMMENT_ID, mentionIds: [OWNER, BOB] });
-  assert.equal(calls.create.length, 0, 'owner is mentioned, so no separate comment notice');
+  assert.equal(calls.insertMany.length, 1, 'owner is mentioned, so no separate comment notice');
   const types = calls.insertMany[0][0].map((n) => `${n.userId}:${n.type}`).sort();
   assert.deepEqual(types, [`${OWNER}:mention`, `${BOB}:mention`].sort());
 });
@@ -94,15 +87,63 @@ test('likes are grouped into one row and unliking decrements it', async () => {
   assert.deepEqual(calls.deleteOne[0][0].count, { $lte: 0 });
 });
 
-test('follow and unfollow create and remove the same row', async () => {
-  let calls = spy();
-  await notifyFollow({ targetId: OWNER, actorId: ALICE, following: true });
-  assert.deepEqual(calls.findOneAndUpdate[0][0], { userId: OWNER, type: 'follow', actorId: ALICE });
+test('drafts never produce notifications', async () => {
+  const calls = spy();
+  const draft = { ...dream('public'), status: 'draft' };
+  await notifyComment({ dream: draft, actorId: ALICE, commentId: COMMENT_ID, mentionIds: [BOB] });
+  await notifyLike({ dream: draft, actorId: ALICE, liked: true });
+  await notifyMentions({ dream: draft, actorId: OWNER, mentionIds: [BOB] });
+  assert.equal(calls.create.length + calls.insertMany.length + calls.findOneAndUpdate.length, 0);
+});
 
+test('a reply notifies the parent comment author, and the owner separately', async () => {
+  const calls = spy();
+  // Alice replies to Bob's comment on Owner's dream
+  await notifyComment({ dream: dream('public'), actorId: ALICE, commentId: COMMENT_ID, parentAuthorId: BOB });
+  const rows = calls.insertMany[0][0].map((r) => `${r.userId}:${r.type}`).sort();
+  assert.deepEqual(rows, [`${OWNER}:comment`, `${BOB}:reply`].sort());
+});
+
+test('when the dream owner is the parent author they get one reply notice, not two', async () => {
+  const calls = spy();
+  await notifyComment({ dream: dream('public'), actorId: ALICE, commentId: COMMENT_ID, parentAuthorId: OWNER });
+  const rows = calls.insertMany[0][0];
+  assert.deepEqual(rows.map((r) => [r.userId, r.type]), [[OWNER, 'reply']]);
+});
+
+test('replying to yourself notifies nobody extra', async () => {
+  const calls = spy();
+  await notifyComment({ dream: dream('public'), actorId: ALICE, commentId: COMMENT_ID, parentAuthorId: ALICE });
+  assert.deepEqual(calls.insertMany[0][0].map((r) => r.userId), [OWNER]);
+});
+
+test('a mention beats a reply for the same person', async () => {
+  const calls = spy();
+  await notifyComment({ dream: dream('public'), actorId: ALICE, commentId: COMMENT_ID, parentAuthorId: BOB, mentionIds: [BOB] });
+  const all = calls.insertMany.flatMap(([rows]) => rows).map((r) => `${r.userId}:${r.type}`).sort();
+  assert.deepEqual(all, [`${BOB}:mention`, `${OWNER}:comment`].sort());
+});
+
+test('a hidden author replying on an anonymous dream is not stored as the actor', async () => {
+  const calls = spy();
+  await notifyComment({ dream: dream('anonymous'), actorId: OWNER, commentId: COMMENT_ID, parentAuthorId: BOB });
+  assert.equal(calls.insertMany[0][0][0].actorId, null);
+  assert.equal(calls.insertMany[0][0][0].type, 'reply');
+});
+
+test('nothing crosses a block', async () => {
+  let calls = spy();
+  const blocked = new Set([OWNER, BOB]);
+  await notifyComment({ dream: dream('public'), actorId: ALICE, commentId: COMMENT_ID, parentAuthorId: BOB, mentionIds: [BOB], blocked });
+  await notifyLike({ dream: dream('public'), actorId: ALICE, liked: true, blocked });
+  await notifyMentions({ dream: dream('public'), actorId: ALICE, mentionIds: [BOB], blocked });
+  assert.equal(calls.create.length + calls.insertMany.length + calls.findOneAndUpdate.length, 0);
+
+  // people who are not blocked still get theirs
   mock.restoreAll();
   calls = spy();
-  await notifyFollow({ targetId: OWNER, actorId: ALICE, following: false });
-  assert.deepEqual(calls.deleteOne[0][0], { userId: OWNER, type: 'follow', actorId: ALICE });
+  await notifyComment({ dream: dream('public'), actorId: ALICE, commentId: COMMENT_ID, parentAuthorId: BOB, blocked: new Set([BOB]) });
+  assert.deepEqual(calls.insertMany[0][0].map((r) => r.userId), [OWNER]);
 });
 
 test('a database failure never throws out of the service', async () => {
@@ -163,8 +204,20 @@ test('defence in depth: the author of an anonymous dream is hidden even if store
   assert.equal(JSON.stringify(out).includes('Alice'), false);
 });
 
-test('follow notifications need no dream', () => {
-  const out = serializeNotification(row({ type: 'follow', dreamId: undefined, commentId: undefined }), OWNER);
-  assert.equal(out.type, 'follow');
-  assert.equal(out.dream, null);
+test('notifications involving a blocked user, or a dream by one, are dropped', () => {
+  assert.equal(serializeNotification(row(), OWNER, new Set([ALICE])), null, 'blocked actor');
+  const byBlocked = row({ dreamId: { _id: DREAM_ID, title: 'x', privacyLevel: 'public', userId: BOB } });
+  assert.equal(serializeNotification(byBlocked, OWNER, new Set([BOB])), null, 'dream by a blocked author');
+  assert.ok(serializeNotification(row(), OWNER, new Set([BOB])), 'unrelated blocks do not matter');
+});
+
+test('draft dreams are never shown in notifications to anyone but their author', () => {
+  const draft = row({ dreamId: { _id: DREAM_ID, title: 'WIP', privacyLevel: 'public', status: 'draft', userId: OWNER } });
+  assert.equal(serializeNotification(draft, BOB), null);
+});
+
+test('replies serialize like comments', () => {
+  const out = serializeNotification(row({ type: 'reply' }), OWNER);
+  assert.equal(out.type, 'reply');
+  assert.equal(out.commentId, COMMENT_ID);
 });

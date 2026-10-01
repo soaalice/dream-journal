@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "server": "node server/index.js",
     "test": "node --test \"server/test/*.test.js\"",
+    "migrate": "node server/scripts/migrate.js",
     "test:e2e": "node --test \"server/test/e2e/*.test.js\"",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "dev:all": "concurrently \"npm run dev\" \"npm run server\""

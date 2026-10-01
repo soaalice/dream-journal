@@ -2,12 +2,14 @@
  * Notification service. Routes call these after their main action succeeds.
  *
  * Rules, enforced here so no route can forget them:
- * - never notify about private dreams;
+ * - never notify about private dreams or drafts;
  * - never notify someone about their own action;
+ * - never notify across a block (`blocked` is the set of users blocked in either direction with the actor);
  * - if the actor is the author of an anonymous dream, the actor is NOT stored (`actorId: null`).
  *
- * Every function swallows its own errors: a failed notification must never fail the comment, like or follow.
+ * Every function swallows its own errors: a failed notification must never fail the comment or like.
  */
+import Dream from '../models/Dream.js';
 import Notification from '../models/Notification.js';
 
 const idOf = (value) => String(value?._id ?? value);
@@ -20,15 +22,18 @@ const safely = (name, fn) => async (...args) => {
   }
 };
 
-/** Minimal dream shape needed here: { _id, userId, privacyLevel } (userId may be populated). */
+const isHidden = (dream) => dream.privacyLevel === 'private' || dream.status === 'draft';
+
+/** Minimal dream shape needed here: { _id, userId, privacyLevel, status } (userId may be populated). */
 const actorFor = (dream, actorId) =>
   dream.privacyLevel === 'anonymous' && idOf(dream.userId) === idOf(actorId) ? null : actorId;
 
-const uniqueRecipients = (ids, actorId) => [...new Set(ids.map(idOf))].filter((id) => id !== idOf(actorId));
+const recipientsFor = (ids, actorId, blocked) =>
+  [...new Set(ids.filter(Boolean).map(idOf))].filter((id) => id !== idOf(actorId) && !blocked.has(id));
 
-export const notifyMentions = safely('mentions', async ({ dream, actorId, commentId, mentionIds }) => {
-  if (dream.privacyLevel === 'private') return;
-  const recipients = uniqueRecipients(mentionIds, actorId);
+export const notifyMentions = safely('mentions', async ({ dream, actorId, commentId, mentionIds, blocked = new Set() }) => {
+  if (isHidden(dream)) return;
+  const recipients = recipientsFor(mentionIds, actorId, blocked);
   if (recipients.length === 0) return;
 
   const actor = actorFor(dream, actorId);
@@ -37,23 +42,39 @@ export const notifyMentions = safely('mentions', async ({ dream, actorId, commen
   );
 });
 
-export const notifyComment = safely('comment', async ({ dream, actorId, commentId, mentionIds = [] }) => {
-  if (dream.privacyLevel === 'private') return;
-  const ownerId = idOf(dream.userId);
+/**
+ * A new comment or reply. Each person gets at most one notification for it, in this order of priority:
+ * mention > reply (to their comment) > comment (on their dream).
+ */
+export const notifyComment = safely(
+  'comment',
+  async ({ dream, actorId, commentId, mentionIds = [], parentAuthorId = null, blocked = new Set() }) => {
+    if (isHidden(dream)) return;
+    const ownerId = idOf(dream.userId);
+    const mentioned = new Set(mentionIds.map(idOf));
+    const actor = actorFor(dream, actorId);
 
-  // The owner gets one notification per comment: a mention wins over a plain comment notice.
-  const ownerAlreadyMentioned = mentionIds.map(idOf).includes(ownerId);
-  if (ownerId !== idOf(actorId) && !ownerAlreadyMentioned) {
-    await Notification.create({ userId: ownerId, type: 'comment', actorId, dreamId: dream._id, commentId });
+    const rows = [];
+    const parent = parentAuthorId ? idOf(parentAuthorId) : null;
+    if (parent && !mentioned.has(parent) && recipientsFor([parent], actorId, blocked).length) {
+      rows.push({ userId: parent, type: 'reply' });
+    }
+    if (ownerId !== parent && !mentioned.has(ownerId) && recipientsFor([ownerId], actorId, blocked).length) {
+      rows.push({ userId: ownerId, type: 'comment' });
+    }
+
+    if (rows.length) {
+      await Notification.insertMany(rows.map((r) => ({ ...r, actorId: actor, dreamId: dream._id, commentId })));
+    }
+    await notifyMentions({ dream, actorId, commentId, mentionIds, blocked });
   }
-  await notifyMentions({ dream, actorId, commentId, mentionIds });
-});
+);
 
 /** `liked` is the state after the toggle: true = a like was added, false = it was removed. */
-export const notifyLike = safely('like', async ({ dream, actorId, liked }) => {
-  if (dream.privacyLevel === 'private') return;
+export const notifyLike = safely('like', async ({ dream, actorId, liked, blocked = new Set() }) => {
+  if (isHidden(dream)) return;
   const ownerId = idOf(dream.userId);
-  if (ownerId === idOf(actorId)) return;
+  if (ownerId === idOf(actorId) || blocked.has(ownerId)) return;
 
   const key = { userId: ownerId, type: 'like', dreamId: dream._id };
   if (liked) {
@@ -69,23 +90,34 @@ export const notifyLike = safely('like', async ({ dream, actorId, liked }) => {
   }
 });
 
-export const notifyFollow = safely('follow', async ({ targetId, actorId, following }) => {
-  const key = { userId: targetId, type: 'follow', actorId };
-  if (following) {
-    await Notification.findOneAndUpdate(key, { $set: { readAt: null } }, { upsert: true, setDefaultsOnInsert: true });
-  } else {
-    await Notification.deleteOne(key);
-  }
-});
-
 export const removeForDream = safely('removeForDream', (dreamId) => Notification.deleteMany({ dreamId }));
 
 export const removeForComment = safely('removeForComment', (commentId) => Notification.deleteMany({ commentId }));
+
+export const removeForComments = safely('removeForComments', (commentIds) =>
+  Notification.deleteMany({ commentId: { $in: commentIds } })
+);
 
 /** When a dream becomes private, everyone but its author loses the notifications about it. */
 export const removeForDreamExceptOwner = safely('removeForDreamExceptOwner', ({ dreamId, ownerId }) =>
   Notification.deleteMany({ dreamId, userId: { $ne: ownerId } })
 );
+
+/**
+ * A new block: drop every notification each side received that came from, or is about, the other
+ * (including hidden-actor ones, which are matched through the dreams).
+ */
+export const removeBetween = safely('removeBetween', async ({ a, b }) => {
+  const [dreamsOfA, dreamsOfB] = await Promise.all([Dream.find({ userId: a }).distinct('_id'), Dream.find({ userId: b }).distinct('_id')]);
+  await Notification.deleteMany({
+    $or: [
+      { userId: a, actorId: b },
+      { userId: b, actorId: a },
+      { userId: a, dreamId: { $in: dreamsOfB } },
+      { userId: b, dreamId: { $in: dreamsOfA } }
+    ]
+  });
+});
 
 /**
  * Account deletion: the notifications the user received, the ones they caused, and anything about

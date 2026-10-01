@@ -2,6 +2,12 @@ import { z } from 'zod';
 
 export const MOODS = ['happy', 'sad', 'scary', 'confusing', 'exciting', 'peaceful', 'anxious', 'mysterious'];
 export const PRIVACY_LEVELS = ['public', 'private', 'anonymous'];
+export const REPORT_REASONS = ['spam', 'harassment', 'hate', 'sexual', 'violence', 'self_harm', 'other'];
+
+/** Replies may nest this deep (top-level comments are depth 0). */
+export const MAX_REPLY_DEPTH = 4;
+/** A user can keep this many unpublished drafts. */
+export const MAX_DRAFTS = 50;
 
 export const objectId = z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid id');
 
@@ -52,17 +58,37 @@ export const buildSchemas = (allowedHosts) => {
   const name = z.string().trim().min(2).max(50);
   const mentions = z.array(objectId).max(20).default([]);
 
-  const dreamBase = z.object({
+  const tags = z
+    .array(z.string().trim().toLowerCase().min(1).max(30))
+    .max(10)
+    .transform((list) => [...new Set(list)]);
+
+  // A dream that is published (visible to others) must be complete.
+  const dreamPublished = z.object({
+    status: z.literal('published').default('published'),
     title: z.string().trim().min(1).max(120),
     content: z.string().trim().min(10).max(10000),
     privacyLevel: z.enum(PRIVACY_LEVELS),
-    tags: z
-      .array(z.string().trim().toLowerCase().min(1).max(30))
-      .max(10)
-      .transform((tags) => [...new Set(tags)]),
+    tags: tags.default([]),
     mood: z.enum(MOODS),
     mentions
   });
+
+  // A draft only needs some text; everything else has a default and is checked again on publish.
+  const dreamDraft = z.object({
+    status: z.literal('draft'),
+    title: z.string().trim().max(120).default(''),
+    content: z.string().trim().min(1).max(10000),
+    privacyLevel: z.enum(PRIVACY_LEVELS).default('private'),
+    tags: tags.default([]),
+    mood: z.enum(MOODS).default('peaceful'),
+    mentions
+  });
+
+  const defaultToPublished = (value) =>
+    value && typeof value === 'object' && !Array.isArray(value) && value.status === undefined
+      ? { ...value, status: 'published' }
+      : value;
 
   return {
     register: z.object({
@@ -87,13 +113,39 @@ export const buildSchemas = (allowedHosts) => {
       newPassword: password
     }),
     deleteAccount: z.object({ password: z.string().min(1).max(72) }),
-    dreamCreate: dreamBase.extend({ tags: dreamBase.shape.tags.default([]) }),
-    dreamUpdate: dreamBase
+    dreamPublished,
+    dreamCreate: z.preprocess(defaultToPublished, z.discriminatedUnion('status', [dreamPublished, dreamDraft])),
+    // Partial update. When the result is published, the route re-checks it against `dreamPublished`.
+    dreamUpdate: z
+      .object({
+        status: z.enum(['draft', 'published']),
+        title: z.string().trim().max(120),
+        content: z.string().trim().min(1).max(10000),
+        privacyLevel: z.enum(PRIVACY_LEVELS),
+        tags,
+        mood: z.enum(MOODS),
+        mentions
+      })
       .partial()
       .refine((v) => Object.keys(v).length > 0, 'At least one field is required'),
     comment: z.object({
       content: z.string().trim().min(1).max(1000),
-      mentions
+      mentions,
+      parentId: objectId.optional()
+    }),
+    report: z.object({
+      reason: z.enum(REPORT_REASONS),
+      details: z.string().trim().max(500).default('')
+    }),
+    mineQuery: z.object({
+      page: z.coerce.number().int().min(1).max(10000).default(1),
+      limit: z.coerce.number().int().min(1).max(50).default(12),
+      status: z.enum(['published', 'draft']).default('published'),
+      privacyLevel: z.enum(PRIVACY_LEVELS).optional()
+    }),
+    blocksQuery: z.object({
+      limit: z.coerce.number().int().min(1).max(50).default(20),
+      before: z.coerce.date().optional()
     }),
     feedQuery: z.object({
       page: z.coerce.number().int().min(1).max(10000).default(1),
@@ -111,9 +163,6 @@ export const buildSchemas = (allowedHosts) => {
         .pipe(z.array(z.enum(MOODS)).max(MOODS.length))
         .optional(),
       q: z.string().trim().max(100).optional()
-    }),
-    userDreamsQuery: z.object({
-      privacyLevel: z.enum(PRIVACY_LEVELS).optional()
     }),
     searchQuery: z.object({ q: z.string().trim().min(2).max(50) })
   };

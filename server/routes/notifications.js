@@ -3,6 +3,7 @@ import { z } from 'zod';
 import Notification from '../models/Notification.js';
 import { authenticate } from '../middleware/auth.js';
 import { asyncHandler, HttpError } from '../utils/asyncHandler.js';
+import { blockedIdsFor } from '../utils/blocks.js';
 import { objectId, validate } from '../utils/validation.js';
 import { serializeNotification } from '../utils/serializeNotification.js';
 
@@ -41,6 +42,7 @@ export default ({ config }) => {
       const filter = { userId: viewerId };
       if (before) filter.updatedAt = { $lt: before };
 
+      const blocked = await blockedIdsFor(viewerId);
       const rows = await Notification.find(filter)
         .sort({ updatedAt: -1 })
         .limit(limit + 1)
@@ -53,7 +55,7 @@ export default ({ config }) => {
       const unreadCount = await Notification.countDocuments({ userId: viewerId, readAt: null });
 
       res.json({
-        notifications: page.map((n) => serializeNotification(n, viewerId)).filter(Boolean),
+        notifications: page.map((n) => serializeNotification(n, viewerId, blocked)).filter(Boolean),
         hasMore,
         nextCursor: hasMore ? page[page.length - 1].updatedAt : null,
         unreadCount

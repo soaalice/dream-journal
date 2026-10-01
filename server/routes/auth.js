@@ -16,7 +16,7 @@ export default ({ config, schemas, authLimiter }) => {
 
   const startSession = async (res, user, status = 200) => {
     setAuthCookie(res, generateToken(user._id, config.jwtSecret), config.isProd);
-    res.status(status).json({ user: await serializeUser(user, user._id) });
+    res.status(status).json({ user: await serializeUser(user) });
   };
 
   router.post(
@@ -65,7 +65,7 @@ export default ({ config, schemas, authLimiter }) => {
     authenticate(config.jwtSecret),
     asyncHandler(async (req, res) => {
       const user = await User.findById(req.user.userId);
-      res.json({ user: await serializeUser(user, user._id) });
+      res.json({ user: await serializeUser(user) });
     })
   );
 

@@ -4,7 +4,7 @@ import { CloudOff, Search, X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useDebounce } from '../hooks/useDebounce';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
-import { useInfiniteScroll } from '../hooks/useInfiniteScroll';
+import { useInfiniteList } from '../hooks/useInfiniteList';
 import { MOODS, MOOD_LIST } from '../lib/moods';
 import { Dream, DreamMood } from '../types';
 import DreamCard from '../components/DreamCard';
@@ -21,11 +21,11 @@ const toggle = <T,>(list: T[], item: T) => (list.includes(item) ? list.filter((x
 
 /**
  * All filters live in the URL (?q=&tag=&mood=), so results can be shared, bookmarked,
- * and survive a refresh or the back button. Filtering and paging happen on the server.
+ * and survive a refresh or the back button. Filtering and paging happen on the server; more dreams load as you scroll.
  */
 const ExplorePage: React.FC = () => {
   useDocumentTitle('Explore');
-  const { publicFeed, fetchFeed } = useApp();
+  const { publicFeed, fetchFeed, dataVersion } = useApp();
   const [params, setParams] = useSearchParams();
 
   const q = params.get('q') ?? '';
@@ -34,14 +34,6 @@ const ExplorePage: React.FC = () => {
 
   const [searchText, setSearchText] = useState(q);
   const debouncedSearch = useDebounce(searchText.trim(), 300);
-
-  const [results, setResults] = useState<Dream[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [attempt, setAttempt] = useState(0);
 
   const updateParams = useCallback(
     (next: { q?: string; tags?: string[]; moods?: string[] }) => {
@@ -63,30 +55,19 @@ const ExplorePage: React.FC = () => {
 
   const filterKey = `${q}|${tags.join(',')}|${moods.join(',')}`;
 
-  useEffect(() => {
-    setPage(1);
-  }, [filterKey]);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    fetchFeed({ page, limit: PAGE_SIZE, q: q || undefined, tag: tags.join(',') || undefined, mood: moods.join(',') || undefined })
-      .then((res) => {
-        if (cancelled) return;
-        setResults((prev) => (page === 1 ? res.dreams : [...prev, ...res.dreams]));
-        setTotal(res.total);
-        setHasMore(res.hasMore);
-      })
-      .catch((err) => !cancelled && setError(err instanceof Error ? err.message : 'Failed to load dreams'))
-      .finally(() => !cancelled && setLoading(false));
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterKey, page, attempt, fetchFeed]);
-
-  const sentinelRef = useInfiniteScroll(() => setPage((p) => p + 1), hasMore && !loading && !error);
+  const list = useInfiniteList<Dream>(
+    async (cursor) => {
+      const page = await fetchFeed({
+        page: typeof cursor === 'number' ? cursor : 1,
+        limit: PAGE_SIZE,
+        q: q || undefined,
+        tag: tags.join(',') || undefined,
+        mood: moods.join(',') || undefined
+      });
+      return { items: page.dreams, hasMore: page.hasMore, next: page.page + 1, total: page.total };
+    },
+    [filterKey, dataVersion]
+  );
 
   const popularTags = useMemo(() => {
     const counts = new Map<string, number>();
@@ -101,6 +82,8 @@ const ExplorePage: React.FC = () => {
     setSearchText('');
     setParams({}, { replace: true });
   };
+
+  const total = list.total ?? 0;
 
   return (
     <div className="animate-fade-in">
@@ -145,7 +128,7 @@ const ExplorePage: React.FC = () => {
         )}
 
         <div className="flex min-h-6 items-center justify-between text-sm text-muted" aria-live="polite">
-          <span>{loading && page === 1 ? 'Searching…' : `${total} ${total === 1 ? 'dream' : 'dreams'} found`}</span>
+          <span>{list.loading && list.items.length === 0 ? 'Searching…' : `${total} ${total === 1 ? 'dream' : 'dreams'} found`}</span>
           {hasFilters && (
             <button type="button" onClick={resetFilters} className="inline-flex items-center gap-1 font-medium text-accent-text hover:underline">
               <X className="h-4 w-4" aria-hidden />
@@ -155,27 +138,31 @@ const ExplorePage: React.FC = () => {
         </div>
       </div>
 
-      {error ? (
+      {list.error && list.items.length === 0 && (
         <EmptyState
           tone="error"
           icon={<CloudOff className="h-12 w-12" />}
           title="Could not load dreams"
-          description={error}
-          action={<Button onClick={() => setAttempt((a) => a + 1)}>Retry</Button>}
+          description={list.error}
+          action={<Button onClick={list.reload}>Retry</Button>}
         />
-      ) : null}
+      )}
 
-      {results.length > 0 && (
+      {list.items.length > 0 && (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          {results.map((dream) => (
+          {list.items.map((dream) => (
             <DreamCard key={dream._id} dream={dream} />
           ))}
         </div>
       )}
 
-      {loading && <div className={results.length > 0 ? 'mt-6' : ''}><DreamGridSkeleton count={results.length > 0 ? 2 : 4} /></div>}
+      {list.loading && (
+        <div className={list.items.length > 0 ? 'mt-6' : ''}>
+          <DreamGridSkeleton count={list.items.length > 0 ? 2 : 4} />
+        </div>
+      )}
 
-      {!loading && !error && results.length === 0 && (
+      {!list.loading && !list.error && list.items.length === 0 && (
         <EmptyState
           icon={<Search className="h-12 w-12" />}
           title="No dreams found"
@@ -184,8 +171,18 @@ const ExplorePage: React.FC = () => {
         />
       )}
 
-      <div ref={sentinelRef} aria-hidden className="h-1" />
-      {!hasMore && !loading && results.length > PAGE_SIZE && <p className="mt-8 text-center text-sm text-muted">You have reached the end.</p>}
+      {list.error && list.items.length > 0 && (
+        <div className="mt-6 text-center">
+          <Button variant="secondary" onClick={list.loadMore}>
+            Retry loading more
+          </Button>
+        </div>
+      )}
+
+      <div ref={list.sentinelRef} aria-hidden className="h-1" />
+      {!list.hasMore && !list.loading && list.items.length > PAGE_SIZE && (
+        <p className="mt-8 text-center text-sm text-muted">You have reached the end.</p>
+      )}
     </div>
   );
 };

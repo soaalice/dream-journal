@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { AtSign, Heart, MessageSquare, UserPlus, X } from 'lucide-react';
+import { AtSign, CornerDownRight, Heart, MessageSquare, X } from 'lucide-react';
 import { AppNotification } from '../../types';
 import Avatar from '../ui/Avatar';
 import RelativeTime from '../dream/RelativeTime';
@@ -13,25 +13,25 @@ interface NotificationItemProps {
 
 const ICONS = {
   comment: MessageSquare,
+  reply: CornerDownRight,
   mention: AtSign,
-  like: Heart,
-  follow: UserPlus
+  like: Heart
 } as const;
 
 /** Where clicking a notification should lead. */
 export const notificationTarget = (n: AppNotification): string => {
-  if (n.type === 'follow') return n.actor ? `/profile/${n.actor._id}` : '/profile';
-  if (!n.dream) return '/';
   return n.commentId ? `/dream/${n.dream._id}#comment-${n.commentId}` : `/dream/${n.dream._id}`;
 };
 
 const Summary: React.FC<{ n: AppNotification }> = ({ n }) => {
   const who = <strong>{n.actor?.name ?? 'Someone'}</strong>;
-  const title = n.dream && <em className="font-serif not-italic font-semibold">“{n.dream.title}”</em>;
+  const title = <em className="font-serif not-italic font-semibold">“{n.dream.title}”</em>;
 
   switch (n.type) {
     case 'comment':
       return <>{who} commented on {title}</>;
+    case 'reply':
+      return <>{who} replied to your comment on {title}</>;
     case 'mention':
       return <>{who} mentioned you in {title}</>;
     case 'like':
@@ -41,8 +41,6 @@ const Summary: React.FC<{ n: AppNotification }> = ({ n }) => {
           {n.count > 1 && ` and ${n.count - 1} ${n.count - 1 === 1 ? 'other' : 'others'}`} liked {title}
         </>
       );
-    case 'follow':
-      return <>{who} started following you</>;
   }
 };
 
