@@ -10,6 +10,7 @@ import userRoutes from './routes/users.js';
 import notificationRoutes from './routes/notifications.js';
 import blockRoutes from './routes/blocks.js';
 import adminRoutes from './routes/admin.js';
+import statsRoutes from './routes/stats.js';
 import adminAppealRoutes from './routes/adminAppeals.js';
 import adminStaffRoutes from './routes/adminStaff.js';
 import appealRoutes from './routes/appeals.js';
@@ -58,6 +59,7 @@ export const createApp = (config) => {
   app.use('/api/users', userRoutes(deps));
   app.use('/api/notifications', notificationRoutes(deps));
   app.use('/api/blocks', blockRoutes(deps));
+  app.use('/api/stats', statsRoutes(deps));
   app.use('/api/admin', adminRoutes(deps));
   app.use('/api/admin', adminAppealRoutes(deps));
   app.use('/api/admin', adminStaffRoutes(deps));

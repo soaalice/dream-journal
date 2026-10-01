@@ -44,6 +44,11 @@ const Header: React.FC = () => {
               My dreams
             </NavLink>
           )}
+          {isAuthenticated && (
+            <NavLink to="/stats" className={navClass}>
+              Insights
+            </NavLink>
+          )}
           {(user?.role === 'admin' || user?.role === 'moderator') && (
             <NavLink to="/admin" className={navClass}>
               Moderation

@@ -18,6 +18,7 @@ const ExplorePage = lazy(() => import('./pages/ExplorePage'));
 const DreamDetailPage = lazy(() => import('./pages/DreamDetailPage'));
 const CreateDreamPage = lazy(() => import('./pages/CreateDreamPage'));
 const QuickCapturePage = lazy(() => import('./pages/QuickCapturePage'));
+const StatsPage = lazy(() => import('./pages/StatsPage'));
 const EditDreamPage = lazy(() => import('./pages/EditDreamPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const EditProfilePage = lazy(() => import('./pages/EditProfilePage'));
@@ -56,6 +57,7 @@ const AppRoutes: React.FC = () => {
           <Route element={<RequireAuth />}>
             <Route path="/new" element={<CreateDreamPage />} />
             <Route path="/capture" element={<QuickCapturePage />} />
+            <Route path="/stats" element={<StatsPage />} />
             <Route path="/dream/:id/edit" element={<EditDreamPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/profile" element={<ProfilePage />} />

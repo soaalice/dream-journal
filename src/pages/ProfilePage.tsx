@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { CalendarDays, CloudOff, Link as LinkIcon, MapPin, Moon, PenLine, Settings } from 'lucide-react';
+import { BarChart3, CalendarDays, CloudOff, Link as LinkIcon, MapPin, Moon, PenLine, Settings } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -91,6 +91,10 @@ const ProfilePage: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap gap-2">
+            <ButtonLink to="/stats" variant="secondary">
+              <BarChart3 className="h-4 w-4" aria-hidden />
+              Insights
+            </ButtonLink>
             <ButtonLink to="/profile/edit" variant="secondary">
               <Settings className="h-4 w-4" aria-hidden />
               Edit profile
