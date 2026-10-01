@@ -65,18 +65,102 @@ Create an intuitive and engaging platform that helps people explore their dreams
 
 ## Core Features
 
-### Dream Sharing
-Users can share their dreams through text entries, enhanced with tags and mood indicators. Privacy settings allow for public, private, or anonymous sharing, giving users full control over their content visibility.
+### Writing and capture
+- **Dreams** with title, mood, tags and privacy (public, private or anonymous). Drafts are saved automatically while you write.
+- **Quick capture** ("I just woke up"): one big box or **voice dictation**, saved as a private draft before the dream fades.
 
-### Personal Dream Journal
-Each user has access to a private profile featuring their personal dream history, enabling them to track patterns and reflect on their dreams over time.
+### Reading and discovering
+- **Home** with a welcome hero, your streak and a summary of your last 30 days.
+- **Explore** with infinite scroll, keyword search and mood/theme filters kept in the URL.
+- A reading-friendly dream page with threaded comments and replies, likes, sharing and `@mentions`.
 
-### Dream Feed
-A dynamic feed displays public and anonymous dream entries from the community. Advanced search functionality allows users to discover dreams through keywords, tags, and mood filters, facilitating meaningful connections and shared experiences.
+### Insights
+A private **Insights** page: calendar heatmap, streaks, mood and theme breakdowns, weekday rhythm and plain-language highlights about your own dreams.
 
-### Community Interaction
-Like and comment on dreams shared by others to foster discussion and engagement.
+### Notifications
+Comments, replies, mentions, grouped likes and moderation notices in a bell and an inbox. Moderators and admins also get **appeal** notifications and inbox filters (All, Appeals, Activity, Decisions on my content, Unread only).
+
+### Safety and moderation
+- Report a dream or a comment, and block users (mutual and silent). Blocked users can manage the list from profile settings.
+- **Moderation panel** for staff: report queue, cases, suspensions, audit log, and staff management for admins. Content that gets enough reports is hidden automatically (threshold configurable).
+- Authors are told what happened and **can appeal**. A moderator cannot decide an appeal against their own decision, and appeals against a suspension are for admins. Staff see the concerned content in context, with a link to the full case.
+- Roles: `user`, `moderator`, `admin`.
+
+### Design
+Light and dark themes, a token-based design system, accessible components and a responsive layout with a bottom bar on phones. See [docs/design-system.md](docs/design-system.md).
+
+## Screenshots
+
+### Writing
+
+| Home | Welcome page (signed out) |
+| --- | --- |
+| ![Home](screens/logged-home.png) | ![Home for visitors](screens/home-guest.png) |
+
+| Recording a dream | Quick capture ("I just woke up") |
+| --- | --- |
+| ![Full dream entry](screens/full-dream-entry.png) | ![Quick capture](screens/quick-dream-entry.png) |
+
+### Reading and sharing
+
+| Explore | Reading a dream |
+| --- | --- |
+| ![Explore](screens/explore.png) | ![Reading a dream](screens/dream-reading.png) |
+
+### Insights and profile
+
+| Insights | Patterns and themes |
+| --- | --- |
+| ![Insights](screens/insights-1.png) | ![Insights, patterns and themes](screens/insights-2.png) |
+
+| Custom avatar | Dark theme |
+| --- | --- |
+| ![Custom avatar](screens/avatar-custom.png) | ![Dark theme](screens/dark-theme.png) |
+
+### Moderation
+
+| Moderation panel | Appealing a decision |
+| --- | --- |
+| ![Admin panel](screens/admin-panel.png) | ![Appeal dialog](screens/appeal-dialog.png) |
+
+| Staff inbox with appeals |
+| --- |
+| ![Staff notifications](screens/staff-inbox-appeals.png) |
+
+### On a phone
+
+| Home | Reading |
+| --- | --- |
+| <img src="screens/mobile-home.png" width="260" alt="Home on a phone"> | <img src="screens/mobile-dream.png" width="260" alt="A dream on a phone"> |
+
+## Tech stack
+
+- **Frontend:** React 18, Vite, TypeScript, Tailwind CSS, React Router.
+- **Backend:** Node.js, Express 4, Mongoose 8, MongoDB, zod validation.
+- **Security:** httpOnly-cookie JWT sessions, CSRF origin check, rate limiting, strict CSP and security headers.
+
+## Quick start
+
+Requires Node.js 20+ and a MongoDB instance.
+
+```bash
+npm install
+cp .env.example .env        # set MONGODB_URI and a JWT_SECRET of 32+ characters
+npm run dev:all             # frontend on :5173, API on :5000
+```
+
+Useful scripts:
+
+| Script | What it does |
+| --- | --- |
+| `npm test` | Unit tests |
+| `npm run test:e2e` | End-to-end API tests against a real MongoDB (throwaway databases) |
+| `npm run typecheck` / `npm run lint` | Type check and lint |
+| `npm run build` | Production build of the frontend |
+| `npm run seed-demo` | Demo users with dreams and comments |
+| `npm run make-admin` / `npm run seed-staff` | Create or promote administrators and moderators |
+| `npm run migrate` | Apply data migrations |
 
 ## Documentation
 
-Setup, architecture, API reference and security notes live in [docs/](docs/README.md).
+Setup, architecture, API reference, security notes and the design system live in [docs/](docs/README.md).
