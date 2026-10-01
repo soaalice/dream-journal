@@ -1,81 +1,45 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
-const userSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-    trim: true,
-    minlength: 2
-  },
-  email: {
-    type: String,
-    required: true,
-    unique: true,
-    trim: true,
-    lowercase: true
-  },
-  password: {
-    type: String,
-    required: true,
-    minlength: 8
-  },
-  bio: {
-    type: String,
-    default: '',
-    maxlength: 160
-  },
-  location: {
-    type: String,
-    default: '',
-    maxlength: 100
-  },
-  website: {
-    type: String,
-    default: ''
-  },
-  avatarUrl: {
-    type: String,
-    default: 'https://api.dicebear.com/8.x/fun-emoji/svg?eyes=plain&mouth=smileTeeth&backgroundColor=a0c4ff'
-  },
-  dreamCount: {
-    type: Number,
-    default: 0
-  },
-  followersCount: {
-    type: Number,
-    default: 0
-  },
-  followingCount: {
-    type: Number,
-    default: 0
-  },
-  joinedAt: {
-    type: Date,
-    default: Date.now
-  }
-}, {
-  timestamps: true
-});
+export const DEFAULT_AVATAR =
+  'https://api.dicebear.com/8.x/fun-emoji/svg?eyes=plain&mouth=smileTeeth&backgroundColor=a0c4ff';
 
-// Hash password before saving
-userSchema.pre('save', async function(next) {
+const BCRYPT_ROUNDS = 12;
+
+const userSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true, trim: true, minlength: 2, maxlength: 50 },
+    email: { type: String, required: true, unique: true, trim: true, lowercase: true, maxlength: 254 },
+    password: { type: String, required: true, minlength: 8, select: false },
+    bio: { type: String, default: '', maxlength: 160 },
+    location: { type: String, default: '', maxlength: 100 },
+    website: { type: String, default: '', maxlength: 200 },
+    avatarUrl: { type: String, default: DEFAULT_AVATAR, maxlength: 500 },
+    // Users this user follows. Follower/following/dream counts are computed, never stored.
+    following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    joinedAt: { type: Date, default: Date.now }
+  },
+  { timestamps: true }
+);
+
+userSchema.index({ name: 1 });
+userSchema.index({ following: 1 });
+
+userSchema.pre('save', async function hashPassword(next) {
   if (!this.isModified('password')) return next();
-  
   try {
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
+    this.password = await bcrypt.hash(this.password, BCRYPT_ROUNDS);
     next();
   } catch (error) {
     next(error);
   }
 });
 
-// Compare password method
-userSchema.methods.comparePassword = async function(candidatePassword) {
-  return bcrypt.compare(candidatePassword, this.password);
+userSchema.methods.comparePassword = function comparePassword(candidate) {
+  return bcrypt.compare(candidate, this.password);
 };
 
-const User = mongoose.model('User', userSchema);
+// Used to equalise response time when the account does not exist.
+export const DUMMY_HASH = bcrypt.hashSync('dummy-password-for-timing', BCRYPT_ROUNDS);
 
-export default User;
+export default mongoose.model('User', userSchema);

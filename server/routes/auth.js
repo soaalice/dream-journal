@@ -1,79 +1,73 @@
 import express from 'express';
-import User from '../models/User.js';
-import { generateToken } from '../middleware/auth.js';
+import bcrypt from 'bcryptjs';
+import User, { DUMMY_HASH } from '../models/User.js';
+import {
+  authenticate,
+  clearAuthCookie,
+  generateToken,
+  setAuthCookie
+} from '../middleware/auth.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { validate } from '../utils/validation.js';
+import { serializeUser } from '../utils/serialize.js';
 
-const router = express.Router();
+export default ({ config, schemas, authLimiter }) => {
+  const router = express.Router();
 
-router.post('/register', async (req, res) => {
-  try {
-    const { name, email, password, avatarUrl } = req.body;
-    
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: 'Email already registered' });
-    }
-    
-    const user = new User({ name, email, password, avatarUrl });
-    await user.save();
-    
-    const token = generateToken(user._id);
-    
-    res.status(201).json({
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        avatarUrl: user.avatarUrl,
-        bio: user.bio,
-        location: user.location,
-        website: user.website,
-        dreamCount: user.dreamCount,
-        followersCount: user.followersCount,
-        followingCount: user.followingCount,
-        joinedAt: user.joinedAt
+  const startSession = async (res, user, status = 200) => {
+    setAuthCookie(res, generateToken(user._id, config.jwtSecret), config.isProd);
+    res.status(status).json({ user: await serializeUser(user, user._id) });
+  };
+
+  router.post(
+    '/register',
+    authLimiter,
+    validate(schemas.register),
+    asyncHandler(async (req, res) => {
+      const { name, email, password, avatarUrl } = req.valid.body;
+
+      if (await User.exists({ email })) {
+        return res.status(409).json({ message: 'Email already registered' });
       }
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'Registration failed' });
-  }
-});
 
-router.post('/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
-    
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
-    
-    const token = generateToken(user._id);
-    
-    res.json({
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        avatarUrl: user.avatarUrl,
-        bio: user.bio,
-        location: user.location,
-        website: user.website,
-        dreamCount: user.dreamCount,
-        followersCount: user.followersCount,
-        followingCount: user.followingCount,
-        joinedAt: user.joinedAt
+      // The unique index still protects against a concurrent duplicate (E11000 -> 409).
+      const user = await User.create({ name, email, password, ...(avatarUrl && { avatarUrl }) });
+      await startSession(res, user, 201);
+    })
+  );
+
+  router.post(
+    '/login',
+    authLimiter,
+    validate(schemas.login),
+    asyncHandler(async (req, res) => {
+      const { email, password } = req.valid.body;
+
+      const user = await User.findOne({ email }).select('+password');
+      // Always run bcrypt so response time does not reveal whether the account exists.
+      const hash = user ? user.password : DUMMY_HASH;
+      const matches = await bcrypt.compare(password, hash);
+
+      if (!user || !matches) {
+        return res.status(401).json({ message: 'Invalid credentials' });
       }
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'Login failed' });
-  }
-});
+      await startSession(res, user);
+    })
+  );
 
-export default router;
+  router.post('/logout', (req, res) => {
+    clearAuthCookie(res, config.isProd);
+    res.json({ message: 'Logged out' });
+  });
+
+  router.get(
+    '/me',
+    authenticate(config.jwtSecret),
+    asyncHandler(async (req, res) => {
+      const user = await User.findById(req.user.userId);
+      res.json({ user: await serializeUser(user, user._id) });
+    })
+  );
+
+  return router;
+};

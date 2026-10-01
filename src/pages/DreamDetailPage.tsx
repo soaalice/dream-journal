@@ -1,20 +1,67 @@
-import React from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, Edit, Heart, SearchX, Trash2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
-import { formatDate } from '../utils/date';
-import MoodBadge from '../components/ui/MoodBadge';
-import TagBadge from '../components/ui/TagBadge';
-import PrivacyBadge from '../components/ui/PrivacyBadge';
-import CommentSection from '../components/CommentSection';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { MOODS } from '../lib/moods';
+import { Button, ButtonLink } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
+import { useConfirm } from '../components/ui/Confirm';
+import { EmptyState } from '../components/ui/EmptyState';
+import { Skeleton } from '../components/ui/Skeleton';
+import { useToast } from '../components/ui/Toast';
 import Avatar from '../components/ui/Avatar';
+import MoodBadge from '../components/ui/MoodBadge';
+import PrivacyBadge from '../components/ui/PrivacyBadge';
+import TagBadge from '../components/ui/TagBadge';
+import CommentSection from '../components/CommentSection';
+import RelativeTime from '../components/dream/RelativeTime';
+import ShareButton from '../components/dream/ShareButton';
 
 const DreamDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { allDreams, user, isDarkMode } = useApp();
+  const { hash } = useLocation();
+  const toast = useToast();
+  const confirm = useConfirm();
+  const { isAuthenticated } = useAuth();
+  const { allDreams, fetchDream, deleteDream, likeDream } = useApp();
 
-  const dream = allDreams.find(dream => dream._id === id);
+  const [status, setStatus] = useState<'loading' | 'ready' | 'missing'>('loading');
+  const dream = allDreams.find((d) => d._id === id);
+
+  useDocumentTitle(dream?.title);
+
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    setStatus('loading');
+    fetchDream(id)
+      .then(() => !cancelled && setStatus('ready'))
+      .catch(() => !cancelled && setStatus('missing'));
+    return () => {
+      cancelled = true;
+    };
+  }, [id, fetchDream]);
+
+  // Jump to the comments, or to one specific comment, when arriving from a card or a notification.
+  useEffect(() => {
+    if (status === 'ready' && hash) {
+      document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'center' });
+    }
+  }, [status, hash, dream?.comments.length]);
+
+  if (!dream && status !== 'missing') {
+    return (
+      <div className="mx-auto max-w-3xl space-y-4" role="status" aria-label="Loading dream">
+        <Skeleton className="h-8 w-24" />
+        <Skeleton className="h-10 w-3/4" />
+        <Skeleton className="h-4 w-1/3" />
+        <Skeleton className="h-40 w-full" />
+      </div>
+    );
+  }
 
   if (!dream) {
     return (
@@ -34,18 +81,11 @@ const DreamDetailPage: React.FC = () => {
   const isAnonymous = dream.privacyLevel === 'anonymous';
 
   return (
-    <div className={`max-w-3xl mx-auto px-4 py-8 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-      <button
-        onClick={() => navigate(-1)}
-        className={`
-          flex items-center mb-6 px-3 py-1 rounded-md
-          ${isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}
-          transition-colors duration-200
-        `}
-      >
-        <ArrowLeft className="w-5 h-5 mr-1" />
+    <div className="mx-auto max-w-3xl animate-fade-in">
+      <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="-ml-3 mb-4">
+        <ArrowLeft className="h-4 w-4" aria-hidden />
         Back
-      </button>
+      </Button>
 
       <div className={`
         rounded-lg overflow-hidden shadow-lg
@@ -73,45 +113,53 @@ const DreamDetailPage: React.FC = () => {
               </div>
             </div>
           </div>
+        </header>
 
-          <div className="flex space-x-2">
-            <MoodBadge mood={dream.mood} size="md" />
-            <PrivacyBadge privacy={dream.privacyLevel} size="md" />
-          </div>
-        </div>
+        <div className="mb-6 max-w-prose whitespace-pre-line text-lg leading-relaxed">{dream.content}</div>
 
-        <div className="prose max-w-none mb-6 whitespace-pre-line">
-          <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-            {dream.content}
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-2 mb-6">
-          {dream.tags.map(tag => (
-            <TagBadge
-              key={tag}
-              tag={tag}
-              onClick={() => navigate(`/explore?tag=${tag}`)}
-            />
-          ))}
-        </div>
-
-        {isOwnDream && (
-          <div className="mb-8 flex justify-end">
-            <button
-              onClick={() => navigate(`/dream/${dream._id}/edit`)}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors duration-200"
-            >
-              <Edit className="w-5 h-5" />
-              Edit Dream
-            </button>
+        {dream.tags.length > 0 && (
+          <div className="mb-6 flex flex-wrap gap-2">
+            {dream.tags.map((tag) => (
+              <TagBadge key={tag} tag={tag} />
+            ))}
           </div>
         )}
 
-        <div className="mt-8 pt-8 border-t border-gray-200">
-          <CommentSection dreamId={dream._id} comments={dream.comments} />
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={handleLike}
+              aria-pressed={dream.likedByMe}
+              className={`inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 transition-colors sm:min-h-9 ${
+                dream.likedByMe ? 'text-red-500' : 'text-muted hover:text-red-500'
+              }`}
+            >
+              <Heart className="h-5 w-5" fill={dream.likedByMe ? 'currentColor' : 'none'} aria-hidden />
+              <span className="tabular-nums">{dream.likesCount}</span>
+              <span className="sr-only">likes</span>
+            </button>
+            {dream.privacyLevel !== 'private' && <ShareButton dreamId={dream._id} title={dream.title} withLabel />}
+          </div>
+
+          {dream.isOwner && (
+            <div className="flex gap-2">
+              <ButtonLink to={`/dream/${dream._id}/edit`} variant="secondary" size="sm">
+                <Edit className="h-4 w-4" aria-hidden />
+                Edit
+              </ButtonLink>
+              <Button variant="ghost" size="sm" onClick={handleDelete} className="text-danger-text hover:bg-danger/10">
+                <Trash2 className="h-4 w-4" aria-hidden />
+                Delete
+              </Button>
+            </div>
+          )}
         </div>
-      </div>
+      </Card>
+
+      <Card className="mt-6">
+        <CommentSection dreamId={dream._id} comments={dream.comments} />
+      </Card>
     </div>
   );
 };
