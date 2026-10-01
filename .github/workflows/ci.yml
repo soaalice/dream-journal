@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+# Only the latest run per branch matters.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Lint, types, tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      # Real database for the end-to-end API tests (they use a throwaway database and drop it afterwards).
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check (app and build config)
+        run: |
+          npm run typecheck
+          npx tsc -p tsconfig.node.json --noEmit
+
+      - name: Unit tests
+        run: npm test
+
+      - name: End-to-end API tests (real MongoDB)
+        run: npm run test:e2e
+        env:
+          MONGODB_TEST_URI: mongodb://127.0.0.1:27017
+
+      - name: Build
+        run: npm run build
+        env:
+          # Same-origin API, as when the server hosts the client (SERVE_CLIENT=true)
+          VITE_API_URL: /api
+
+      - name: Check the build ships its security headers
+        run: |
+          test -f dist/_headers
+          grep -q "Content-Security-Policy" dist/_headers
+          grep -q "frame-ancestors 'none'" dist/_headers
+          ! grep -q "<script>" dist/index.html   # no inline scripts: the CSP forbids them
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          retention-days: 7
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      # Fails on known HIGH or CRITICAL vulnerabilities in what ships to production.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high

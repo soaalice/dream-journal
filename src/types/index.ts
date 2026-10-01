@@ -28,6 +28,8 @@ export interface Dream {
   isOwner: boolean;
   /** drafts are visible to their author only */
   status: DreamStatus;
+  /** set only for the author when moderators hid or removed the dream */
+  moderation: ModerationInfo | null;
   privacyLevel: PrivacyLevel;
   tags: string[];
   mood: DreamMood;
@@ -41,6 +43,12 @@ export interface Dream {
 }
 
 export type DreamStatus = 'draft' | 'published';
+
+export interface ModerationInfo {
+  /** hidden = automatically, waiting for a moderator; removed = a moderator's decision */
+  state: 'hidden' | 'removed';
+  message: string;
+}
 
 export interface DreamInput {
   title: string;
@@ -129,9 +137,25 @@ export interface Comment {
   isOwn: boolean;
   /** an empty placeholder kept because replies still hang under it (deleted, or by someone you blocked) */
   deleted: boolean;
+  /** set only for the author when moderators hid or removed their comment */
+  moderation: ModerationInfo | null;
 }
 
-export type NotificationType = 'comment' | 'reply' | 'mention' | 'like';
+export type NotificationType = 'comment' | 'reply' | 'mention' | 'like' | 'moderation';
+
+export type ModerationEvent = 'removed' | 'hidden' | 'restored' | 'appeal_upheld' | 'appeal_overturned';
+
+/** What moderators did with the person's content; carries its own copy of the text. */
+export interface ModerationNotice {
+  event: ModerationEvent;
+  kind: 'dream' | 'comment';
+  title: string;
+  excerpt: string;
+  message: string;
+  reasons: ReportReason[];
+  appeal: { status: 'open' | 'upheld' | 'overturned' } | null;
+  canAppeal: boolean;
+}
 
 export interface AppNotification {
   _id: string;
@@ -142,8 +166,10 @@ export interface AppNotification {
   count: number;
   /** null when the actor is hidden (anonymous author) or no longer exists */
   actor: DreamAuthor | null;
-  dream: { _id: string; title: string };
+  dream: { _id: string; title: string } | null;
   commentId: string | null;
+  /** present when type is `moderation` */
+  moderation?: ModerationNotice;
 }
 
 export interface AuthState {

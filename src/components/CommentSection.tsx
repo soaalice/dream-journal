@@ -130,6 +130,12 @@ const CommentThread: React.FC<NodeProps> = (props) => {
                 </span>
               </div>
               <p className="mt-1 whitespace-pre-line break-words text-fg/90">{renderCommentContent(comment.content)}</p>
+              {comment.moderation && (
+                <p role="status" className="mt-2 rounded-md bg-red-100 px-2 py-1 text-xs text-red-900 dark:bg-red-400/15 dark:text-red-100">
+                  {comment.moderation.state === 'removed' ? 'Removed by moderators.' : 'Hidden while moderators review it.'} Only you can see it.
+                  {comment.moderation.message && ` ${comment.moderation.message}`}
+                </p>
+              )}
             </div>
 
             <div className="mt-1 flex flex-wrap items-center gap-1 text-sm">

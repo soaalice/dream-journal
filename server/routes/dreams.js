@@ -8,7 +8,8 @@ import { authenticate, optionalAuth } from '../middleware/auth.js';
 import { asyncHandler, HttpError } from '../utils/asyncHandler.js';
 import { blockedIdsFor } from '../utils/blocks.js';
 import { MAX_DRAFTS, MAX_REPLY_DEPTH, objectId, validate } from '../utils/validation.js';
-import { canView, populateDream, serializeDream } from '../utils/serialize.js';
+import { canView, HIDDEN_BY_MODERATION, populateDream, serializeDream } from '../utils/serialize.js';
+import { maybeAutoHide } from '../services/moderation.js';
 import { deleteCommentFromDream } from '../services/comments.js';
 import {
   notifyComment,
@@ -74,7 +75,11 @@ export default ({ config, schemas, reportLimiter }) => {
       const viewerId = req.user?.userId;
       const blocked = await blockedIdsFor(viewerId);
 
-      const filter = { status: { $ne: 'draft' }, privacyLevel: { $in: ['public', 'anonymous'] } };
+      const filter = {
+        status: { $ne: 'draft' },
+        moderationState: { $nin: HIDDEN_BY_MODERATION },
+        privacyLevel: { $in: ['public', 'anonymous'] }
+      };
       if (blocked.size) filter.userId = { $nin: [...blocked] };
       if (tag?.length) filter.tags = { $in: tag };
       if (mood?.length) filter.mood = { $in: mood };
@@ -311,6 +316,7 @@ export default ({ config, schemas, reportLimiter }) => {
       const dream = await Dream.findById(req.params.id);
       if (!dream || !canView(dream, viewerId, blocked)) throw new HttpError(404, 'Dream not found');
       if (dream.status === 'draft') throw new HttpError(400, 'Publish this dream before it can receive comments');
+      if (HIDDEN_BY_MODERATION.includes(dream.moderationState)) throw new HttpError(400, 'This dream is hidden by moderators');
 
       const { content, mentions, parentId } = req.valid.body;
 
@@ -366,6 +372,12 @@ export default ({ config, schemas, reportLimiter }) => {
 
   // ---------- reports ----------
 
+  /** Hides the content if enough different people reported it. A failure here must never fail the report itself. */
+  const autoHide = (dreamId, commentId) =>
+    maybeAutoHide({ threshold: config.autoHideThreshold, dreamId, commentId }).catch((error) =>
+      console.error('Auto-hide failed:', error.message)
+    );
+
   const createReport = async ({ reporterId, targetType, dream, comment, body }) => {
     // Keep what was reported, so moderators still have it if the author deletes it afterwards.
     const snapshot = comment
@@ -399,6 +411,7 @@ export default ({ config, schemas, reportLimiter }) => {
       if (idOf(dream.userId) === viewerId) throw new HttpError(400, 'You cannot report your own dream');
 
       await createReport({ reporterId: viewerId, targetType: 'dream', dream, body: req.valid.body });
+      await autoHide(dream._id, null);
       res.status(201).json({ message: 'Report received. Thank you.' });
     })
   );
@@ -416,6 +429,7 @@ export default ({ config, schemas, reportLimiter }) => {
       if (idOf(comment.userId) === viewerId) throw new HttpError(400, 'You cannot report your own comment');
 
       await createReport({ reporterId: viewerId, targetType: 'comment', dream, comment, body: req.valid.body });
+      await autoHide(dream._id, comment._id);
       res.status(201).json({ message: 'Report received. Thank you.' });
     })
   );

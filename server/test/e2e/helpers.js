@@ -17,7 +17,9 @@ export const config = {
   avatarHosts: ['api.dicebear.com'],
   trustProxy: false,
   // tests sign in far more often than a person would; production keeps the default of 20 per 15 minutes
-  authRateLimit: 1000
+  authRateLimit: 1000,
+  // content is hidden automatically once 3 different people reported it (the real default is 10)
+  autoHideThreshold: 3
 };
 
 export const startE2E = async (name) => {

@@ -10,9 +10,13 @@ import userRoutes from './routes/users.js';
 import notificationRoutes from './routes/notifications.js';
 import blockRoutes from './routes/blocks.js';
 import adminRoutes from './routes/admin.js';
+import adminAppealRoutes from './routes/adminAppeals.js';
+import adminStaffRoutes from './routes/adminStaff.js';
+import appealRoutes from './routes/appeals.js';
 import { originGuard } from './middleware/auth.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { buildSchemas } from './utils/validation.js';
+import { mountClient } from './clientHosting.js';
 
 export const createApp = (config) => {
   const app = express();
@@ -21,7 +25,12 @@ export const createApp = (config) => {
   app.disable('x-powered-by');
   if (config.trustProxy) app.set('trust proxy', 1);
 
-  app.use(helmet());
+  // The CSP is set per kind of response: a locked-down one for the API below, the app's own one for pages (clientHosting.js).
+  app.use(helmet({ contentSecurityPolicy: false }));
+  app.use('/api', (req, res, next) => {
+    res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
+    next();
+  });
   app.use(cors({ origin: config.clientOrigin, credentials: true }));
   app.use(express.json({ limit: '50kb' }));
   app.use(cookieParser());
@@ -50,6 +59,11 @@ export const createApp = (config) => {
   app.use('/api/notifications', notificationRoutes(deps));
   app.use('/api/blocks', blockRoutes(deps));
   app.use('/api/admin', adminRoutes(deps));
+  app.use('/api/admin', adminAppealRoutes(deps));
+  app.use('/api/admin', adminStaffRoutes(deps));
+  app.use('/api/appeals', appealRoutes(deps));
+
+  if (config.serveClient) mountClient(app, config);
 
   app.use(notFound);
   app.use(errorHandler);

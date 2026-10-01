@@ -7,15 +7,7 @@
     <title>Dream Journal</title>
     <meta name="description" content="Record, explore and share your dreams." />
     <meta name="theme-color" content="#7c3aed" />
-    <script>
-      // Apply the saved theme before first paint to avoid a light flash in dark mode.
-      try {
-        var t = localStorage.getItem('theme');
-        if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-          document.documentElement.classList.add('dark');
-        }
-      } catch (e) {}
-    </script>
+    <script src="/theme-init.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">

@@ -6,6 +6,7 @@ import { useDraftAutosave } from '../hooks/useDraftAutosave';
 import { MOODS, MOOD_LIST, PRIVACY, PRIVACY_LIST } from '../lib/moods';
 import { DreamMood, DreamStatus, PrivacyLevel } from '../types';
 import { Button } from './ui/Button';
+import VoiceInputButton from './VoiceInputButton';
 import { Chip } from './ui/Chip';
 import { useConfirm } from './ui/Confirm';
 import { Field, Input, Textarea } from './ui/Field';
@@ -211,6 +212,12 @@ const DreamForm: React.FC<DreamFormProps> = ({ editMode = false, dreamId, initia
     <form onSubmit={handlePublish} className="space-y-8" noValidate>
       <Field label="What did you dream?" error={errors.content} counter={{ value: values.content.length, max: LIMITS.content }}>
         {({ id, describedBy, invalid }) => (
+          <>
+          <div className="mb-2">
+            <VoiceInputButton
+              onText={(text) => set('content', values.content && !/\s$/.test(values.content) ? `${values.content} ${text}` : `${values.content}${text}`)}
+            />
+          </div>
           <Textarea
             id={id}
             aria-describedby={describedBy}
@@ -222,6 +229,7 @@ const DreamForm: React.FC<DreamFormProps> = ({ editMode = false, dreamId, initia
             autoFocus={!editMode}
             className="resize-y text-base leading-relaxed"
           />
+          </>
         )}
       </Field>
 

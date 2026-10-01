@@ -90,17 +90,35 @@ export const notifyLike = safely('like', async ({ dream, actorId, liked, blocked
   }
 });
 
-export const removeForDream = safely('removeForDream', (dreamId) => Notification.deleteMany({ dreamId }));
+/**
+ * Tells an author what moderators did with their content. These are kept when the content is deleted or hidden (they
+ * carry their own copy of the text), so the cleanup helpers below never touch them.
+ * `event`: removed | hidden | restored | appeal_upheld | appeal_overturned
+ */
+export const notifyModeration = safely('moderation', async ({ userId, event, kind, dreamId, commentId, title, excerpt, message, reasons }) => {
+  await Notification.create({
+    userId,
+    type: 'moderation',
+    actorId: null,
+    dreamId: dreamId ?? undefined,
+    commentId: commentId ?? undefined,
+    moderation: { event, kind, title, excerpt, message, reasons }
+  });
+});
 
-export const removeForComment = safely('removeForComment', (commentId) => Notification.deleteMany({ commentId }));
+const NOT_MODERATION = { type: { $ne: 'moderation' } };
+
+export const removeForDream = safely('removeForDream', (dreamId) => Notification.deleteMany({ dreamId, ...NOT_MODERATION }));
+
+export const removeForComment = safely('removeForComment', (commentId) => Notification.deleteMany({ commentId, ...NOT_MODERATION }));
 
 export const removeForComments = safely('removeForComments', (commentIds) =>
-  Notification.deleteMany({ commentId: { $in: commentIds } })
+  Notification.deleteMany({ commentId: { $in: commentIds }, ...NOT_MODERATION })
 );
 
 /** When a dream becomes private, everyone but its author loses the notifications about it. */
 export const removeForDreamExceptOwner = safely('removeForDreamExceptOwner', ({ dreamId, ownerId }) =>
-  Notification.deleteMany({ dreamId, userId: { $ne: ownerId } })
+  Notification.deleteMany({ dreamId, userId: { $ne: ownerId }, ...NOT_MODERATION })
 );
 
 /**

@@ -13,6 +13,32 @@ const idOf = (value) => String(value?._id ?? value);
 export const serializeNotification = (n, viewerId, blocked = new Set()) => {
   const dream = n.dreamId && n.dreamId.title !== undefined ? n.dreamId : null;
 
+  // Moderation notices are addressed to the author and carry their own copy of the text, so they do not depend
+  // on the content still being visible (or existing).
+  if (n.type === 'moderation') {
+    const m = n.moderation ?? {};
+    return {
+      _id: String(n._id),
+      type: 'moderation',
+      read: Boolean(n.readAt),
+      createdAt: n.updatedAt ?? n.createdAt,
+      count: 1,
+      actor: null,
+      dream: dream ? { _id: idOf(dream), title: dream.title } : null,
+      commentId: n.commentId ? String(n.commentId) : null,
+      moderation: {
+        event: m.event,
+        kind: m.kind,
+        title: m.title ?? '',
+        excerpt: m.excerpt ?? '',
+        message: m.message ?? '',
+        reasons: [...(m.reasons ?? [])],
+        appeal: n.appealId?.status ? { status: n.appealId.status } : null,
+        canAppeal: m.event === 'removed' && !n.appealId
+      }
+    };
+  }
+
   if (!dream || !canView(dream, viewerId, blocked)) return null;
   if (n.actorId && blocked.has(idOf(n.actorId))) return null;
 

@@ -167,7 +167,7 @@ test('admin panel', async (t) => {
       note: 'just an opinion'
     });
     assert.equal(res.status, 200);
-    assert.deepEqual(res.body, { resolvedReports: 1, removed: false, suspended: false });
+    assert.deepEqual(res.body, { resolvedReports: 1, removed: false, restored: false, suspended: false });
 
     assert.equal((await admin.c.get('/admin/reports')).body.total, 1);
     const dismissed = (await admin.c.get('/admin/reports?status=dismissed')).body;
@@ -206,7 +206,7 @@ test('admin panel', async (t) => {
       removeContent: true,
       note: 'hate speech'
     });
-    assert.deepEqual(res.body, { resolvedReports: 1, removed: true, suspended: false });
+    assert.deepEqual(res.body, { resolvedReports: 1, removed: true, restored: false, suspended: false });
 
     const after = (await alice.c.get(`/dreams/${thread._id}`)).body;
     const placeholder = after.comments.find((c) => c._id === parent._id);
@@ -232,7 +232,7 @@ test('admin panel', async (t) => {
       suspensionReason: 'Repeated harassment',
       note: 'second strike'
     });
-    assert.deepEqual(res.body, { resolvedReports: 2, removed: true, suspended: true });
+    assert.deepEqual(res.body, { resolvedReports: 2, removed: true, restored: false, suspended: true });
     assert.equal((await bob.c.get(`/dreams/${dream._id}`)).status, 404, 'the dream was deleted');
 
     // the suspended user is locked out immediately, even with an open session
@@ -300,7 +300,7 @@ test('admin panel', async (t) => {
 
     // removing something that is already gone is harmless
     const res = await admin.c.post('/admin/reports/resolve', { dreamId: doomed._id, resolution: 'reviewed', removeContent: true });
-    assert.deepEqual(res.body, { resolvedReports: 1, removed: false, suspended: false });
+    assert.deepEqual(res.body, { resolvedReports: 1, removed: false, restored: false, suspended: false });
   });
 
   await t.test('every action is in the append-only audit log', async () => {
@@ -376,7 +376,7 @@ test('moderator role', async (t) => {
     assert.equal((await chief.c.get('/admin/reports?status=open')).body.cases.some((c) => c.dreamId === samsDream._id), true, 'and the case is still open');
 
     const remove = await mia.c.post('/admin/reports/resolve', { dreamId: samsDream._id, resolution: 'reviewed', removeContent: true, note: 'spam' });
-    assert.deepEqual(remove.body, { resolvedReports: 1, removed: true, suspended: false });
+    assert.deepEqual(remove.body, { resolvedReports: 1, removed: true, restored: false, suspended: false });
     assert.equal((await rita.c.get(`/dreams/${samsDream._id}`)).status, 404);
   });
 

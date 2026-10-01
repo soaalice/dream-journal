@@ -6,6 +6,9 @@ import Dream from '../models/Dream.js';
 
 const idOf = (value) => String(value?._id ?? value);
 const NO_BLOCKS = new Set();
+/** moderation states that hide content from everyone but its author */
+export const HIDDEN_BY_MODERATION = ['hidden', 'removed'];
+const isModerated = (item) => HIDDEN_BY_MODERATION.includes(item?.moderationState);
 
 const isOwnerOf = (dream, viewerId) => Boolean(viewerId) && idOf(dream.userId) === String(viewerId);
 
@@ -14,15 +17,22 @@ const isOwnerOf = (dream, viewerId) => Boolean(viewerId) && idOf(dream.userId) =
  * (drafts and private dreams included), minus anything by someone blocked in either direction.
  */
 export const visibilityFilter = (viewerId, blocked = NO_BLOCKS) => {
-  const published = { status: { $ne: 'draft' }, privacyLevel: { $in: ['public', 'anonymous'] } };
+  const published = {
+    status: { $ne: 'draft' },
+    moderationState: { $nin: HIDDEN_BY_MODERATION },
+    privacyLevel: { $in: ['public', 'anonymous'] }
+  };
   const base = viewerId ? { $or: [published, { userId: viewerId }] } : published;
   return blocked.size > 0 ? { $and: [base, { userId: { $nin: [...blocked] } }] } : base;
 };
 
-/** Drafts and private dreams are visible to their author only; blocked authors are invisible to the viewer. */
+/**
+ * Drafts, private dreams and dreams hidden or removed by moderators are visible to their author only;
+ * blocked authors are invisible to the viewer.
+ */
 export const canView = (dream, viewerId, blocked = NO_BLOCKS) => {
   if (isOwnerOf(dream, viewerId)) return true;
-  if (dream.status === 'draft' || dream.privacyLevel === 'private') return false;
+  if (dream.status === 'draft' || dream.privacyLevel === 'private' || isModerated(dream)) return false;
   return !blocked.has(idOf(dream.userId));
 };
 
@@ -47,7 +57,9 @@ const serializeComments = (dream, viewerId, blocked, isOwner) => {
     childrenOf.set(key, [...(childrenOf.get(key) ?? []), c]);
   }
 
-  const isHidden = (c) => c.deleted || blocked.has(idOf(c.userId));
+  const isMine = (c) => Boolean(viewerId) && idOf(c.userId) === String(viewerId);
+  // moderated comments are still shown to the person who wrote them, so they know what was acted on
+  const isHidden = (c) => c.deleted || blocked.has(idOf(c.userId)) || (isModerated(c) && !isMine(c));
   const memo = new Map();
   const hasVisibleDescendant = (c) => {
     const key = String(c._id);
@@ -82,7 +94,8 @@ const serializeComments = (dream, viewerId, blocked, isOwner) => {
         mentions: c.mentions.map(String),
         canDelete: isOwn || isOwner,
         isOwn,
-        deleted: false
+        deleted: false,
+        moderation: isOwn && isModerated(c) ? { state: c.moderationState, message: c.moderationMessage } : null
       };
     });
 };
@@ -104,6 +117,8 @@ export const serializeDream = (dream, viewerId, blocked = NO_BLOCKS) => {
     userName: hideAuthor ? ANON.name : owner?.name ?? 'Deleted user',
     isOwner,
     status: dream.status ?? 'published',
+    // only the author is told their dream was hidden or removed
+    moderation: isOwner && isModerated(dream) ? { state: dream.moderationState, message: dream.moderationMessage } : null,
     privacyLevel: dream.privacyLevel,
     tags: dream.tags,
     mood: dream.mood,

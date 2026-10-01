@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Edit, Heart, SearchX, Trash2 } from 'lucide-react';
+import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, Edit, Heart, SearchX, ShieldAlert, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -118,6 +118,29 @@ const DreamDetailPage: React.FC = () => {
       <Card as="article" className="relative overflow-hidden p-6 sm:p-8">
         <span className={`absolute inset-x-0 top-0 h-1 ${MOODS[dream.mood].stripe}`} aria-hidden />
 
+        {dream.moderation && (
+          <div role="status" className="mb-6 flex items-start gap-3 rounded-lg bg-red-100 p-4 text-red-900 dark:bg-red-400/15 dark:text-red-100">
+            <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
+            <div>
+              <p className="font-medium">
+                {dream.moderation.state === 'removed'
+                  ? 'Moderators removed this dream. Only you can see it.'
+                  : 'This dream is hidden while moderators review reports about it. Only you can see it.'}
+              </p>
+              {dream.moderation.message && <p className="mt-1 text-sm">{dream.moderation.message}</p>}
+              {dream.moderation.state === 'removed' && (
+                <p className="mt-2 text-sm">
+                  Think this is a mistake? Open{' '}
+                  <Link to="/notifications" className="font-medium underline">
+                    your notifications
+                  </Link>{' '}
+                  and choose &ldquo;Appeal this decision&rdquo;.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
         <header className="mb-6">
           <div className="mb-4 flex items-start justify-between gap-2">
             <div className="flex flex-wrap gap-2">
@@ -150,6 +173,7 @@ const DreamDetailPage: React.FC = () => {
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
           <div className="flex items-center gap-1">
+            {!dream.moderation && (
             <button
               type="button"
               onClick={handleLike}
@@ -162,15 +186,18 @@ const DreamDetailPage: React.FC = () => {
               <span className="tabular-nums">{dream.likesCount}</span>
               <span className="sr-only">likes</span>
             </button>
-            {dream.privacyLevel !== 'private' && <ShareButton dreamId={dream._id} title={dream.title} withLabel />}
+            )}
+            {dream.privacyLevel !== 'private' && !dream.moderation && <ShareButton dreamId={dream._id} title={dream.title} withLabel />}
           </div>
 
           {dream.isOwner && (
             <div className="flex gap-2">
+              {!dream.moderation && (
               <ButtonLink to={`/dream/${dream._id}/edit`} variant="secondary" size="sm">
                 <Edit className="h-4 w-4" aria-hidden />
                 Edit
               </ButtonLink>
+              )}
               <Button variant="ghost" size="sm" onClick={handleDelete} className="text-danger-text hover:bg-danger/10">
                 <Trash2 className="h-4 w-4" aria-hidden />
                 Delete
@@ -181,7 +208,11 @@ const DreamDetailPage: React.FC = () => {
       </Card>
 
       <Card className="mt-6">
+        {dream.moderation ? (
+          <p className="text-muted">Comments are closed while this dream is hidden.</p>
+        ) : (
         <CommentSection dreamId={dream._id} comments={dream.comments} />
+        )}
       </Card>
     </div>
   );

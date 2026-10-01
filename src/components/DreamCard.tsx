@@ -26,6 +26,7 @@ interface DreamCardProps {
 const DreamCard: React.FC<DreamCardProps> = ({ dream, showPrivacy = true }) => {
   const { _id, title, content, createdAt, userId, userName, privacyLevel, tags, mood, likedByMe, likesCount, commentsCount, isOwner, status } = dream;
   const isDraft = status === 'draft';
+  const moderation = dream.moderation;
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -66,6 +67,11 @@ const DreamCard: React.FC<DreamCardProps> = ({ dream, showPrivacy = true }) => {
         </div>
 
         <div className="mb-3 flex flex-wrap gap-1.5">
+          {moderation && (
+            <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800 dark:bg-red-400/15 dark:text-red-200">
+              {moderation.state === 'removed' ? 'Removed by moderators' : 'Hidden, under review'}
+            </span>
+          )}
           {isDraft && (
             <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-400/15 dark:text-amber-200">
               Draft

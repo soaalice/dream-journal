@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowRight, Globe, Lock, Moon, PenLine, UserX, X } from 'lucide-react';
+import { ArrowRight, Globe, Lock, Moon, PenLine, Sunrise, UserX, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -80,12 +80,18 @@ const HomePage: React.FC = () => {
         </p>
         <div className="flex flex-wrap gap-3">
           {user && (
-            <ButtonLink to="/new" size="lg">
-              <PenLine className="h-5 w-5" aria-hidden />
-              Record a dream
-            </ButtonLink>
+            <>
+              <ButtonLink to="/capture" size="lg">
+                <Sunrise className="h-5 w-5" aria-hidden />
+                I just woke up
+              </ButtonLink>
+              <ButtonLink to="/new" variant="secondary" size="lg">
+                <PenLine className="h-5 w-5" aria-hidden />
+                Record a dream
+              </ButtonLink>
+            </>
           )}
-          <ButtonLink to="/explore" variant={user ? 'secondary' : 'primary'} size="lg">
+          <ButtonLink to="/explore" variant={user ? 'ghost' : 'primary'} size="lg">
             Explore dreams
           </ButtonLink>
         </div>

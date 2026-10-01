@@ -7,6 +7,7 @@ export interface AdminSummary {
   reviewedLast7Days: number;
   dismissedLast7Days: number;
   suspendedUsers: number;
+  openAppeals: number;
 }
 
 /** All reports about one dream or comment, shown as a single item in the queue. */
@@ -22,6 +23,8 @@ export interface AdminCaseSummary {
   lastReportedAt: string;
   lastResolvedAt: string | null;
   contentExists: boolean;
+  /** visible | hidden (automatically, awaiting review) | removed (by a moderator) */
+  moderationState: 'visible' | 'hidden' | 'removed';
   title: string;
   excerpt: string;
   authorName: string;
@@ -58,6 +61,7 @@ export interface AdminCaseDetail {
     content: string;
     privacyLevel: PrivacyLevel | null;
     draft: boolean;
+    moderationState: 'visible' | 'hidden' | 'removed' | null;
     /** the author is hidden from the community: handle their identity with care */
     anonymous: boolean;
     reportedText: string;
@@ -86,6 +90,8 @@ export interface ResolveCaseInput {
   removeContent?: boolean;
   suspendAuthor?: boolean;
   suspensionReason?: string;
+  /** what the author is told when their content is removed */
+  authorMessage?: string;
   note?: string;
 }
 
@@ -103,7 +109,55 @@ export type AuditAction =
   | 'content_removed'
   | 'user_suspended'
   | 'user_unsuspended'
-  | 'viewed_anonymous_author';
+  | 'viewed_anonymous_author'
+  | 'auto_hidden'
+  | 'content_restored'
+  | 'appeal_upheld'
+  | 'appeal_overturned'
+  | 'role_changed';
+
+export type AppealStatus = 'open' | 'upheld' | 'overturned';
+
+export interface AppealSummary {
+  _id: string;
+  targetType: 'dream' | 'comment' | 'account';
+  status: AppealStatus;
+  createdAt: string;
+  resolvedAt: string | null;
+  resolvedBy: string | null;
+  authorName: string;
+  title: string;
+  excerpt: string;
+  message: string;
+}
+
+export interface AppealDetail {
+  appeal: {
+    _id: string;
+    targetType: 'dream' | 'comment' | 'account';
+    status: AppealStatus;
+    message: string;
+    createdAt: string;
+    resolvedAt: string | null;
+    resolvedBy: string | null;
+    resolutionNote: string;
+    /** the moderator whose decision is appealed; they cannot decide it (unless they are an administrator) */
+    decidedBy: string | null;
+    decidedByMe: boolean;
+  };
+  author: { name: string; email: string | null; joinedAt: string; suspended: boolean; suspensionReason: string } | null;
+  content: { exists: boolean; title: string; text: string; moderationState: 'visible' | 'hidden' | 'removed' | null; moderationMessage: string };
+  reasons: ReportReason[];
+}
+
+export interface StaffMember {
+  _id: string;
+  name: string;
+  email: string;
+  role: 'user' | 'moderator' | 'admin';
+  joinedAt: string;
+  suspended: boolean;
+}
 
 export interface AuditEntry {
   _id: string;
@@ -111,6 +165,7 @@ export interface AuditEntry {
   targetType: 'dream' | 'comment' | 'user';
   dreamId: string | null;
   commentId: string | null;
+  /** who acted; "System" for automatic actions */
   admin: string;
   targetUser: string | null;
   reportCount: number;

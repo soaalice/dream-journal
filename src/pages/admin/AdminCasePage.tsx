@@ -44,6 +44,7 @@ const AdminCasePage: React.FC = () => {
   const [removeContent, setRemoveContent] = useState(false);
   const [suspendAuthor, setSuspendAuthor] = useState(false);
   const [suspensionReason, setSuspensionReason] = useState('');
+  const [authorMessage, setAuthorMessage] = useState('');
   const [submitting, setSubmitting] = useState<'dismissed' | 'reviewed' | null>(null);
 
   useEffect(() => {
@@ -109,6 +110,7 @@ const AdminCasePage: React.FC = () => {
       removeContent: resolution === 'reviewed' && removeContent,
       suspendAuthor: resolution === 'reviewed' && suspendAuthor,
       suspensionReason: suspendAuthor ? suspensionReason : undefined,
+      authorMessage: resolution === 'reviewed' && removeContent && authorMessage ? authorMessage : undefined,
       note: note || undefined
     };
 
@@ -151,6 +153,17 @@ const AdminCasePage: React.FC = () => {
               </p>
             )}
 
+            {target.moderationState === 'hidden' && (
+              <p role="status" className="mb-3 rounded-lg bg-amber-100 p-3 text-sm text-amber-900 dark:bg-amber-400/15 dark:text-amber-100">
+                Hidden automatically after enough reports. Only the author can see it. Dismissing, or marking reviewed without removing,
+                brings it back; removing it keeps it hidden and lets the author appeal.
+              </p>
+            )}
+            {target.moderationState === 'removed' && (
+              <p role="status" className="mb-3 rounded-lg bg-surface-2 p-3 text-sm">
+                This content was already removed. Only the author can see it.
+              </p>
+            )}
             {!target.exists && (
               <p className="mb-3 text-sm text-muted">The author deleted it. This is the text that was saved when it was reported.</p>
             )}
@@ -248,7 +261,7 @@ const AdminCasePage: React.FC = () => {
                     <input
                       type="checkbox"
                       checked={removeContent}
-                      disabled={!target.exists || authorIsStaff}
+                      disabled={!target.exists || authorIsStaff || target.moderationState === 'removed'}
                       onChange={(e) => setRemoveContent(e.target.checked)}
                       className="mt-1 h-4 w-4 accent-purple-600"
                     />
@@ -259,6 +272,13 @@ const AdminCasePage: React.FC = () => {
                       </span>
                     </span>
                   </label>
+                  {removeContent && (
+                    <Field label="Message to the author" optional hint="Shown in their notification. Leave empty for the standard message." counter={{ value: authorMessage.length, max: 300 }}>
+                      {({ id, describedBy }) => (
+                        <Textarea id={id} aria-describedby={describedBy} rows={2} maxLength={300} value={authorMessage} onChange={(e) => setAuthorMessage(e.target.value)} className="resize-none" />
+                      )}
+                    </Field>
+                  )}
                   <label className={`flex items-start gap-2 ${canSuspend ? '' : 'opacity-50'}`}>
                     <input
                       type="checkbox"
@@ -296,10 +316,10 @@ const AdminCasePage: React.FC = () => {
                     disabled={submitting !== null || (suspendAuthor && suspensionReason.trim().length < 3)}
                     variant={removeContent || suspendAuthor ? 'danger' : 'primary'}
                   >
-                    {removeContent || suspendAuthor ? 'Apply and resolve' : 'Mark as reviewed'}
+                    {removeContent || suspendAuthor ? 'Apply and resolve' : target.moderationState === 'hidden' ? 'Restore and mark reviewed' : 'Mark as reviewed'}
                   </Button>
                   <Button variant="secondary" onClick={() => resolve('dismissed')} loading={submitting === 'dismissed'} disabled={submitting !== null}>
-                    Dismiss reports
+                    {target.moderationState === 'hidden' ? 'Dismiss and restore' : 'Dismiss reports'}
                   </Button>
                   <p className="text-sm text-muted">
                     Resolving closes all {openReports.length} open {openReports.length === 1 ? 'report' : 'reports'} about this content.

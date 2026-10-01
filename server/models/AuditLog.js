@@ -8,7 +8,12 @@ export const AUDIT_ACTIONS = [
   'content_removed',
   'user_suspended',
   'user_unsuspended',
-  'viewed_anonymous_author'
+  'viewed_anonymous_author',
+  'auto_hidden',
+  'content_restored',
+  'appeal_upheld',
+  'appeal_overturned',
+  'role_changed'
 ];
 
 /**
@@ -17,7 +22,9 @@ export const AUDIT_ACTIONS = [
  */
 const auditSchema = new mongoose.Schema(
   {
-    adminId: { type: ObjectId, ref: 'User', required: true },
+    /** the person who acted; null for automatic actions (`system: true`) */
+    adminId: { type: ObjectId, ref: 'User', default: null },
+    system: { type: Boolean, default: false },
     action: { type: String, enum: AUDIT_ACTIONS, required: true },
     targetType: { type: String, enum: ['dream', 'comment', 'user'], required: true },
     dreamId: { type: ObjectId, default: null },

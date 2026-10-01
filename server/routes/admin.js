@@ -1,5 +1,6 @@
 import express from 'express';
 import mongoose from 'mongoose';
+import Appeal from '../models/Appeal.js';
 import AuditLog from '../models/AuditLog.js';
 import Dream from '../models/Dream.js';
 import Report from '../models/Report.js';
@@ -7,8 +8,10 @@ import User from '../models/User.js';
 import { authenticate, requireAdmin, requireStaff } from '../middleware/auth.js';
 import { asyncHandler, HttpError } from '../utils/asyncHandler.js';
 import { objectId, validate } from '../utils/validation.js';
-import { deleteCommentFromDream } from '../services/comments.js';
-import { removeForComments, removeForDream } from '../services/notifications.js';
+import { audit } from '../services/audit.js';
+import { reasonsFor, setModerationState, tellAuthor } from '../services/moderation.js';
+
+const DEFAULT_REMOVAL_MESSAGE = 'It breaks our community guidelines.';
 
 const idOf = (value) => String(value?._id ?? value);
 const toObjectId = (value) => (value ? new mongoose.Types.ObjectId(String(value)) : null);
@@ -32,8 +35,6 @@ export default ({ config, schemas }) => {
     objectId.safeParse(value).success ? next() : res.status(400).json({ message: 'Invalid id' })
   );
 
-  const audit = (adminId, entry) => AuditLog.create({ adminId, ...entry });
-
   const caseMatch = ({ dreamId, commentId }) => ({ dreamId: toObjectId(dreamId), commentId: toObjectId(commentId) });
 
   /** Number of distinct reported items matching `match`. */
@@ -52,13 +53,14 @@ export default ({ config, schemas }) => {
     '/summary',
     asyncHandler(async (req, res) => {
       const since = new Date(Date.now() - 7 * DAY_MS);
-      const [open, reviewed, dismissed, suspendedUsers] = await Promise.all([
+      const [open, reviewed, dismissed, suspendedUsers, openAppeals] = await Promise.all([
         countCases({ status: 'open' }),
         countCases({ status: 'reviewed', resolvedAt: { $gte: since } }),
         countCases({ status: 'dismissed', resolvedAt: { $gte: since } }),
-        User.countDocuments({ suspendedAt: { $ne: null } })
+        User.countDocuments({ suspendedAt: { $ne: null } }),
+        Appeal.countDocuments({ status: 'open' })
       ]);
-      res.json({ open, reviewedLast7Days: reviewed, dismissedLast7Days: dismissed, suspendedUsers });
+      res.json({ open, reviewedLast7Days: reviewed, dismissedLast7Days: dismissed, suspendedUsers, openAppeals });
     })
   );
 
@@ -101,7 +103,7 @@ export default ({ config, schemas }) => {
       const total = result.total[0]?.n ?? 0;
 
       const [dreams, authors] = await Promise.all([
-        Dream.find({ _id: { $in: rows.map((r) => r._id.dreamId) } }).select('title content privacyLevel status userId comments'),
+        Dream.find({ _id: { $in: rows.map((r) => r._id.dreamId) } }).select('title content privacyLevel status moderationState userId comments'),
         User.find({ _id: { $in: rows.map((r) => r.reportedUserId) } }).select('name suspendedAt')
       ]);
       const dreamById = new Map(dreams.map((d) => [String(d._id), d]));
@@ -129,6 +131,7 @@ export default ({ config, schemas }) => {
           lastReportedAt: row.lastReportedAt,
           lastResolvedAt: row.lastResolvedAt ?? null,
           contentExists: Boolean(live),
+          moderationState: (comment ?? dream)?.moderationState ?? 'visible',
           title: dream?.title ?? row.snapshot?.title ?? '',
           excerpt: excerpt(live ? (comment ? comment.content : dream.content) : row.snapshot?.content),
           authorName: author?.name ?? 'Deleted user',
@@ -186,6 +189,8 @@ export default ({ config, schemas }) => {
           content: live ? (comment ? comment.content : dream.content) : snapshot.content ?? '',
           privacyLevel: dream?.privacyLevel ?? null,
           draft: dream?.status === 'draft',
+          /** visible | hidden (automatically, awaiting review) | removed (by a moderator) */
+          moderationState: (comment ?? dream)?.moderationState ?? 'visible',
           anonymous,
           // text kept when the report was made, in case it was edited afterwards
           reportedText: snapshot.content ?? '',
@@ -222,15 +227,17 @@ export default ({ config, schemas }) => {
   );
 
   /**
-   * Resolve every open report about one piece of content. `reviewed` can also remove the content and/or suspend
-   * its author; `dismissed` changes nothing but the report status.
+   * Resolve every open report about one piece of content.
+   *  - `dismissed`: nothing is wrong. Content that was hidden automatically comes back.
+   *  - `reviewed`: a decision was taken. `removeContent` takes the content down (it is hidden, not deleted, so an appeal
+   *    can restore it) and tells the author; without it, hidden content comes back. `suspendAuthor` is admins only.
    */
   router.post(
     '/reports/resolve',
     validate(schemas.adminResolve),
     asyncHandler(async (req, res) => {
       const adminId = req.user.userId;
-      const { dreamId, commentId, resolution, removeContent, suspendAuthor, suspensionReason, note } = req.valid.body;
+      const { dreamId, commentId, resolution, removeContent, suspendAuthor, suspensionReason, authorMessage, note } = req.valid.body;
       const match = { ...caseMatch({ dreamId, commentId }), status: 'open' };
 
       const open = await Report.find(match);
@@ -250,24 +257,28 @@ export default ({ config, schemas }) => {
 
       const targetType = commentId ? 'comment' : 'dream';
       const base = { targetType, dreamId, commentId: commentId ?? null, targetUserId: authorId, reportCount: open.length, note };
-      const snapshot = open[0].snapshot ?? {};
+      const reasons = await reasonsFor({ dreamId, commentId });
+      const target = { authorId, dreamId, commentId };
 
       let removed = false;
+      let restored = false;
+
       if (removeContent) {
-        const dream = await Dream.findById(dreamId);
-        if (dream && commentId) {
-          const affected = deleteCommentFromDream(dream, commentId);
-          if (affected.length) {
-            await dream.save();
-            await removeForComments(affected);
-            removed = true;
-          }
-        } else if (dream) {
-          await Dream.deleteOne({ _id: dreamId });
-          await removeForDream(dreamId);
-          removed = true;
+        const message = authorMessage || DEFAULT_REMOVAL_MESSAGE;
+        const result = await setModerationState({ dreamId, commentId, state: 'removed', by: adminId, message });
+        removed = result.changed;
+        if (removed) {
+          await audit(adminId, { ...base, action: 'content_removed', snapshot: { title: result.title, content: result.content.slice(0, 2000) } });
+          await tellAuthor({ event: 'removed', ...target, title: result.title, content: result.content, message, reasons });
         }
-        if (removed) await audit(adminId, { ...base, action: 'content_removed', snapshot: { title: snapshot.title, content: snapshot.content } });
+      } else {
+        // Nothing to remove: content that was hidden automatically while waiting for this decision comes back.
+        const result = await setModerationState({ dreamId, commentId, state: 'visible' });
+        restored = result.changed;
+        if (restored) {
+          await audit(adminId, { ...base, action: 'content_restored' });
+          await tellAuthor({ event: 'restored', ...target, title: result.title, content: result.content, message: 'Moderators found nothing wrong.' });
+        }
       }
 
       let suspended = false;
@@ -285,7 +296,7 @@ export default ({ config, schemas }) => {
       });
       await audit(adminId, { ...base, action: resolution === 'dismissed' ? 'report_dismissed' : 'report_reviewed' });
 
-      res.json({ resolvedReports: open.length, removed, suspended });
+      res.json({ resolvedReports: open.length, removed, restored, suspended });
     })
   );
 
@@ -357,7 +368,7 @@ export default ({ config, schemas }) => {
           targetType: e.targetType,
           dreamId: e.dreamId ? String(e.dreamId) : null,
           commentId: e.commentId ? String(e.commentId) : null,
-          admin: e.adminId?.name ?? 'Deleted admin',
+          admin: e.system ? 'System' : e.adminId?.name ?? 'Deleted admin',
           targetUser: e.targetUserId?.name ?? null,
           reportCount: e.reportCount,
           note: e.note,

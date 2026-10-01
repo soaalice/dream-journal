@@ -90,7 +90,11 @@ test('comment deletion rights: comment author or dream owner', () => {
 });
 
 test('visibilityFilter never matches other users private dreams or drafts', () => {
-  const published = { status: { $ne: 'draft' }, privacyLevel: { $in: ['public', 'anonymous'] } };
+  const published = {
+    status: { $ne: 'draft' },
+    moderationState: { $nin: ['hidden', 'removed'] },
+    privacyLevel: { $in: ['public', 'anonymous'] }
+  };
   assert.deepEqual(visibilityFilter(undefined), published);
   assert.deepEqual(visibilityFilter(OWNER).$or, [published, { userId: OWNER }]);
 });
@@ -169,4 +173,43 @@ test('placeholders for deep threads stay linked through the whole chain', () => 
 test('corrupt cyclic threads do not hang the serializer', () => {
   const thread = [comment('c1', OTHER, 'c2', { deleted: true }), comment('c2', OTHER, 'c1', { deleted: true })];
   assert.doesNotThrow(() => serializeDream(withComments(thread), OWNER));
+});
+
+// ---------- moderation state ----------
+
+test('dreams hidden or removed by moderators are visible to their author only', () => {
+  for (const moderationState of ['hidden', 'removed']) {
+    const dream = makeDream('public', { moderationState });
+    assert.equal(Boolean(canView(dream, OWNER)), true, `${moderationState}: the author still sees it`);
+    assert.equal(Boolean(canView(dream, OTHER)), false);
+    assert.equal(Boolean(canView(dream, undefined)), false);
+  }
+  assert.equal(Boolean(canView(makeDream('public', { moderationState: 'visible' }), OTHER)), true);
+  assert.equal(Boolean(canView(makeDream('public', { moderationState: undefined }), OTHER)), true, 'old dreams count as visible');
+});
+
+test('only the author is told that their dream was moderated', () => {
+  const removed = makeDream('public', { moderationState: 'removed', moderationMessage: 'Breaks the rules' });
+  assert.deepEqual(serializeDream(removed, OWNER).moderation, { state: 'removed', message: 'Breaks the rules' });
+  assert.equal(serializeDream(makeDream('public'), OWNER).moderation, null);
+  assert.equal(serializeDream(makeDream('public', { moderationState: 'visible' }), OWNER).moderation, null);
+});
+
+test('moderated comments become placeholders for everyone but their author', () => {
+  const thread = [
+    comment('c1', OTHER, null, { moderationState: 'removed', moderationMessage: 'rude' }),
+    comment('c2', OWNER, 'c1')
+  ];
+  const forOwner = serializeDream(withComments(thread), OWNER);
+  assert.equal(forOwner.comments[0].deleted, true, 'the dream owner sees a placeholder');
+  assert.equal(JSON.stringify(forOwner).includes('comment c1'), false, 'and not the text');
+
+  const forAuthor = serializeDream(withComments(thread), OTHER);
+  assert.equal(forAuthor.comments[0].deleted, false, 'the author still sees their own comment');
+  assert.deepEqual(forAuthor.comments[0].moderation, { state: 'removed', message: 'rude' });
+
+  // without replies a moderated comment disappears for everybody else
+  const alone = serializeDream(withComments([comment('c9', OTHER, null, { moderationState: 'hidden' })]), OWNER);
+  assert.equal(alone.comments.length, 0);
+  assert.equal(alone.commentsCount, 0);
 });

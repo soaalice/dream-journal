@@ -17,6 +17,7 @@ const HomePage = lazy(() => import('./pages/HomePage'));
 const ExplorePage = lazy(() => import('./pages/ExplorePage'));
 const DreamDetailPage = lazy(() => import('./pages/DreamDetailPage'));
 const CreateDreamPage = lazy(() => import('./pages/CreateDreamPage'));
+const QuickCapturePage = lazy(() => import('./pages/QuickCapturePage'));
 const EditDreamPage = lazy(() => import('./pages/EditDreamPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const EditProfilePage = lazy(() => import('./pages/EditProfilePage'));
@@ -29,6 +30,9 @@ const AdminReportsPage = lazy(() => import('./pages/admin/AdminReportsPage'));
 const AdminCasePage = lazy(() => import('./pages/admin/AdminCasePage'));
 const AdminSuspendedPage = lazy(() => import('./pages/admin/AdminSuspendedPage'));
 const AdminAuditPage = lazy(() => import('./pages/admin/AdminAuditPage'));
+const AdminAppealsPage = lazy(() => import('./pages/admin/AdminAppealsPage'));
+const AdminAppealPage = lazy(() => import('./pages/admin/AdminAppealPage'));
+const AdminStaffPage = lazy(() => import('./pages/admin/AdminStaffPage'));
 
 const AppRoutes: React.FC = () => {
   const { loading } = useAuth();
@@ -51,6 +55,7 @@ const AppRoutes: React.FC = () => {
           <Route path="/auth" element={<AuthPage />} />
           <Route element={<RequireAuth />}>
             <Route path="/new" element={<CreateDreamPage />} />
+            <Route path="/capture" element={<QuickCapturePage />} />
             <Route path="/dream/:id/edit" element={<EditDreamPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
@@ -61,8 +66,11 @@ const AppRoutes: React.FC = () => {
                 <Route index element={<Navigate to="reports" replace />} />
                 <Route path="reports" element={<AdminReportsPage />} />
                 <Route path="case" element={<AdminCasePage />} />
+                <Route path="appeals" element={<AdminAppealsPage />} />
+                <Route path="appeals/:id" element={<AdminAppealPage />} />
                 <Route element={<RequireAdmin role="admin" />}>
                   <Route path="suspended" element={<AdminSuspendedPage />} />
+                  <Route path="staff" element={<AdminStaffPage />} />
                   <Route path="audit" element={<AdminAuditPage />} />
                 </Route>
               </Route>

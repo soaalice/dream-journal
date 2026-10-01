@@ -52,10 +52,21 @@ const AdminLayout: React.FC = () => {
             </span>
           )}
         </NavLink>
+        <NavLink to="/admin/appeals" className={tabClass}>
+          Appeals
+          {summary && summary.openAppeals > 0 && (
+            <span className="rounded-full bg-danger px-2 py-0.5 text-xs font-bold leading-none text-white" aria-label={`${summary.openAppeals} open`}>
+              {summary.openAppeals}
+            </span>
+          )}
+        </NavLink>
         {isAdmin && (
           <>
             <NavLink to="/admin/suspended" className={tabClass}>
               Suspended users
+            </NavLink>
+            <NavLink to="/admin/staff" className={tabClass}>
+              Staff
             </NavLink>
             <NavLink to="/admin/audit" className={tabClass}>
               Audit log

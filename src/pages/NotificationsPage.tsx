@@ -62,6 +62,13 @@ const NotificationsPage: React.FC = () => {
     }
   };
 
+  const handleAppealed = (n: AppNotification) =>
+    list.setItems((prev) =>
+      prev.map((r) =>
+        r._id === n._id && r.moderation ? { ...r, moderation: { ...r.moderation, canAppeal: false, appeal: { status: 'open' as const } } } : r
+      )
+    );
+
   const handleDismiss = async (n: AppNotification) => {
     const previous = rows;
     list.setItems((prev) => prev.filter((r) => r._id !== n._id));
@@ -83,7 +90,7 @@ const NotificationsPage: React.FC = () => {
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">{title}</h2>
         <ul className="space-y-3">
           {group.map((n) => (
-            <NotificationItem key={n._id} notification={n} onOpen={handleOpen} onDismiss={handleDismiss} />
+            <NotificationItem key={n._id} notification={n} onOpen={handleOpen} onDismiss={handleDismiss} onAppealed={handleAppealed} />
           ))}
         </ul>
       </section>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { CloudOff, Eye, EyeOff, Flag, ScrollText, ShieldAlert, ShieldCheck, Trash2, UserCheck } from 'lucide-react';
+import { Bot, CloudOff, Eye, EyeOff, Flag, Gavel, RotateCcw, ScrollText, ShieldAlert, ShieldCheck, Trash2, UserCheck, UserCog } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { useInfiniteList } from '../../hooks/useInfiniteList';
@@ -24,7 +24,12 @@ const ACTIONS: Record<AuditAction, { label: string; Icon: React.ComponentType<{ 
   content_removed: { label: 'removed content', Icon: Trash2 },
   user_suspended: { label: 'suspended', Icon: ShieldAlert },
   user_unsuspended: { label: 'unsuspended', Icon: UserCheck },
-  viewed_anonymous_author: { label: 'viewed an anonymous author', Icon: EyeOff }
+  viewed_anonymous_author: { label: 'viewed an anonymous author', Icon: EyeOff },
+  auto_hidden: { label: 'hid automatically', Icon: Bot },
+  content_restored: { label: 'restored', Icon: RotateCcw },
+  appeal_upheld: { label: 'declined an appeal about', Icon: Gavel },
+  appeal_overturned: { label: 'accepted an appeal about', Icon: Gavel },
+  role_changed: { label: 'changed the role of', Icon: UserCog }
 };
 
 const targetOf = (e: AuditEntry) => {

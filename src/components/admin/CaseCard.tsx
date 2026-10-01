@@ -26,6 +26,10 @@ const CaseCard: React.FC<{ item: AdminCaseSummary }> = ({ item }) => {
           <Flag className="h-3.5 w-3.5" aria-hidden />
           {item.reportCount} {item.reportCount === 1 ? 'report' : 'reports'}
         </span>
+        {item.moderationState === 'hidden' && (
+          <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-amber-800 dark:bg-amber-400/15 dark:text-amber-200">Auto-hidden</span>
+        )}
+        {item.moderationState === 'removed' && <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-muted">Removed</span>}
         {resolved && <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-muted">Resolved</span>}
         {!item.contentExists && <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-muted">Content gone</span>}
         {item.authorSuspended && (

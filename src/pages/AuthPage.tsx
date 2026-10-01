@@ -1,16 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Check, Circle, Moon } from 'lucide-react';
+import { api, ApiError } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { LoginCredentials, RegisterData } from '../types';
 import EmojiAvatarPicker from '../components/EmojiAvatarPicker';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
-import { Field, Input, PasswordInput } from '../components/ui/Field';
+import { Field, Input, PasswordInput, Textarea } from '../components/ui/Field';
 import { useToast } from '../components/ui/Toast';
 
 const loginSchema = z.object({
@@ -56,22 +57,84 @@ const PasswordRules: React.FC<{ value: string }> = ({ value }) => {
   );
 };
 
+type AppealStatus = 'open' | 'upheld' | 'overturned' | null;
+
+/**
+ * A suspended person cannot sign in, so they appeal with the credentials they just typed. Shows where an earlier
+ * appeal stands, and the 30-day wait after a declined one.
+ */
+const SuspensionAppeal: React.FC<{ email: string; password: string; initial: AppealStatus }> = ({ email, password, initial }) => {
+  const toast = useToast();
+  const [status, setStatus] = useState<AppealStatus>(initial);
+  const [message, setMessage] = useState('');
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const send = async () => {
+    setSending(true);
+    setError(null);
+    try {
+      await api('/auth/appeal-suspension', { method: 'POST', body: { email, password, message }, skipAuthHandler: true });
+      setStatus('open');
+      toast.success('Your appeal was sent. An administrator will review it.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not send your appeal');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (status === 'open') return <p role="status" className="rounded-lg bg-surface-2 p-3 text-sm">Your appeal is being reviewed. Try signing in again later.</p>;
+  if (status === 'upheld') {
+    return (
+      <p role="status" className="rounded-lg bg-surface-2 p-3 text-sm">
+        Your last appeal was declined. You can appeal again 30 days after that decision.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-3 rounded-lg bg-surface-2 p-3">
+      <p className="text-sm font-medium">Think this is a mistake? Appeal the suspension.</p>
+      <Textarea
+        aria-label="Why the suspension is a mistake"
+        rows={4}
+        maxLength={1000}
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+        placeholder="Explain what happened (at least 10 characters)"
+        className="resize-none"
+      />
+      {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
+      <Button onClick={send} loading={sending} disabled={message.trim().length < 10} className="w-full">
+        Send appeal
+      </Button>
+    </div>
+  );
+};
+
 const LoginForm: React.FC<{ onDone: () => void }> = ({ onDone }) => {
   const { login } = useAuth();
   const toast = useToast();
+  const [suspension, setSuspension] = useState<{ appealStatus: AppealStatus } | null>(null);
   const {
     register,
     handleSubmit,
     setError,
+    getValues,
     formState: { errors, isSubmitting }
   } = useForm<LoginCredentials>({ resolver: zodResolver(loginSchema) });
 
   const onSubmit = async (data: LoginCredentials) => {
+    setSuspension(null);
     try {
       await login(data);
       toast.success('Welcome back!');
       onDone();
     } catch (error) {
+      if (error instanceof ApiError && error.code === 'suspended') {
+        setSuspension({ appealStatus: (error.data?.appealStatus as AppealStatus) ?? null });
+      }
       setError('root', { message: error instanceof Error ? error.message : 'Login failed' });
     }
   };
@@ -93,6 +156,7 @@ const LoginForm: React.FC<{ onDone: () => void }> = ({ onDone }) => {
           {errors.root.message}
         </p>
       )}
+      {suspension && <SuspensionAppeal email={getValues('email')} password={getValues('password')} initial={suspension.appealStatus} />}
       <Button type="submit" loading={isSubmitting} className="w-full" size="lg">
         Sign in
       </Button>

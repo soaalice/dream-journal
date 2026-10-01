@@ -2,7 +2,10 @@ import mongoose from 'mongoose';
 
 const { ObjectId } = mongoose.Schema.Types;
 
-export const NOTIFICATION_TYPES = ['comment', 'reply', 'mention', 'like'];
+export const NOTIFICATION_TYPES = ['comment', 'reply', 'mention', 'like', 'moderation'];
+
+/** What happened, for `moderation` notifications. */
+export const MODERATION_EVENTS = ['removed', 'hidden', 'restored', 'appeal_upheld', 'appeal_overturned'];
 
 const NINETY_DAYS = 90 * 24 * 60 * 60;
 
@@ -20,6 +23,20 @@ const notificationSchema = new mongoose.Schema(
     commentId: { type: ObjectId },
     /** `like` notifications are grouped per dream: this is the number of likes behind one row */
     count: { type: Number, default: 1 },
+    /**
+     * `moderation` notifications tell an author what moderators did to their content. They carry their own copy of
+     * the text, so they still make sense if the content is later deleted.
+     */
+    moderation: {
+      event: { type: String, enum: MODERATION_EVENTS },
+      kind: { type: String, enum: ['dream', 'comment'] },
+      title: { type: String, default: '' },
+      excerpt: { type: String, default: '', maxlength: 300 },
+      message: { type: String, default: '', maxlength: 300 },
+      reasons: [{ type: String }]
+    },
+    /** set once the author appealed the decision this notification is about */
+    appealId: { type: ObjectId, ref: 'Appeal', default: null },
     readAt: { type: Date, default: null }
   },
   { timestamps: true }

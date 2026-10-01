@@ -154,6 +154,28 @@ export const buildSchemas = (allowedHosts) => {
       page: z.coerce.number().int().min(1).max(10000).default(1),
       limit: z.coerce.number().int().min(1).max(50).default(20)
     }),
+    appeal: z.object({
+      notificationId: objectId,
+      message: z.string().trim().min(10, 'Tell us why you think this was a mistake (at least 10 characters)').max(1000)
+    }),
+    suspensionAppeal: z.object({
+      email: z.string().trim().toLowerCase().email().max(254),
+      password: z.string().min(1).max(72),
+      message: z.string().trim().min(10, 'Tell us why you think this was a mistake (at least 10 characters)').max(1000)
+    }),
+    adminAppealsQuery: z.object({
+      page: z.coerce.number().int().min(1).max(10000).default(1),
+      limit: z.coerce.number().int().min(1).max(50).default(15),
+      status: z.enum(['open', 'upheld', 'overturned', 'all']).default('open')
+    }),
+    adminAppealDecision: z.object({
+      decision: z.enum(['upheld', 'overturned']),
+      note: z.string().trim().max(500).default(''),
+      /** what the author is told about the decision */
+      message: z.string().trim().max(300).default('')
+    }),
+    adminRole: z.object({ role: z.enum(['user', 'moderator', 'admin']) }),
+    adminUserSearch: z.object({ q: z.string().trim().min(2).max(50) }),
     adminCaseQuery: z.object({ dreamId: objectId, commentId: objectId.optional() }),
     adminResolve: z
       .object({
@@ -163,6 +185,8 @@ export const buildSchemas = (allowedHosts) => {
         removeContent: z.boolean().default(false),
         suspendAuthor: z.boolean().default(false),
         suspensionReason: z.string().trim().max(300).default(''),
+        /** what the author is told when their content is removed (the note below stays internal) */
+        authorMessage: z.string().trim().max(300).default(''),
         note: z.string().trim().max(500).default('')
       })
       .superRefine((v, ctx) => {

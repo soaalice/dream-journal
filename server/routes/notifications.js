@@ -47,7 +47,8 @@ export default ({ config }) => {
         .sort({ updatedAt: -1 })
         .limit(limit + 1)
         .populate('actorId', 'name avatarUrl')
-        .populate('dreamId', 'title privacyLevel userId');
+        .populate('dreamId', 'title privacyLevel userId status moderationState')
+        .populate('appealId', 'status');
 
       const hasMore = rows.length > limit;
       const page = hasMore ? rows.slice(0, limit) : rows;
