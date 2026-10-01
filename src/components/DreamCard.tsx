@@ -1,183 +1,120 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Heart, MessageSquare } from 'lucide-react';
 import { Dream } from '../types';
-import { formatDistanceToNow } from '../utils/date';
-import { Heart, MessageSquare, Share2 } from 'lucide-react';
+import { MOODS } from '../lib/moods';
+import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
-import MoodBadge from './ui/MoodBadge';
-import TagBadge from './ui/TagBadge';
-import PrivacyBadge from './ui/PrivacyBadge';
+import { useToast } from './ui/Toast';
 import Avatar from './ui/Avatar';
+import MoodBadge from './ui/MoodBadge';
+import PrivacyBadge from './ui/PrivacyBadge';
+import TagBadge from './ui/TagBadge';
+import RelativeTime from './dream/RelativeTime';
+import ShareButton from './dream/ShareButton';
 
 interface DreamCardProps {
   dream: Dream;
   showPrivacy?: boolean;
 }
 
-const DreamCard: React.FC<DreamCardProps> = ({
-  dream,
-  showPrivacy = true
-}) => {
-  const {
-    _id,
-    title,
-    content,
-    createdAt,
-    userId,
-    userName,
-    privacyLevel,
-    tags,
-    mood,
-    likes,
-    comments
-  } = dream;
+/**
+ * The whole card is clickable through a "stretched link" on the title (a real <a>, so it can be
+ * tabbed to and opened in a new tab). Other interactive elements sit above it with `relative z-10`.
+ */
+const DreamCard: React.FC<DreamCardProps> = ({ dream, showPrivacy = true }) => {
+  const { _id, title, content, createdAt, userId, userName, privacyLevel, tags, mood, likedByMe, likesCount, comments } = dream;
 
   const navigate = useNavigate();
-  const { user, likeDream, isDarkMode } = useApp();
-  const [isLiked, setIsLiked] = useState(false);
+  const location = useLocation();
+  const toast = useToast();
+  const { isAuthenticated } = useAuth();
+  const { likeDream } = useApp();
 
-  useEffect(() => {
-    if (user && dream.likes.includes(user._id)) {
-      setIsLiked(true);
-    }
-  }, [user, dream.likes]);
-
-  const truncatedContent = content.length > 150
-    ? `${content.substring(0, 150)}...`
-    : content;
-
-  const isAnonymous = privacyLevel === 'anonymous';
-
-  const handleLike = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!user) {
-      navigate('/auth');
+  const handleLike = async () => {
+    if (!isAuthenticated) {
+      toast.info('Sign in to like dreams');
+      navigate('/auth', { state: { from: location.pathname + location.search } });
       return;
     }
     try {
       await likeDream(_id);
-      setIsLiked(!isLiked);
-    } catch (error) {
-      console.error('Error liking dream:', error);
-    }
-  };
-
-  const handleComment = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!user) {
-      navigate('/auth');
-      return;
-    }
-    navigate(`/dream/${_id}`);
-  };
-
-  const handleTagClick = (e: React.MouseEvent, tag: string) => {
-    e.stopPropagation();
-    navigate(`/explore?tag=${tag}`);
-  };
-
-  const handleProfileClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!isAnonymous) {
-      navigate(`/profile/${userId}`);
+    } catch {
+      toast.error('Could not update your like. Please try again.');
     }
   };
 
   return (
-    <div
-      className={`
-        ${isDarkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-white hover:bg-gray-50'} 
-        rounded-lg shadow-md overflow-hidden cursor-pointer transform transition-all duration-300 hover:-translate-y-1 hover:shadow-lg
-      `}
-      onClick={() => navigate(`/dream/${_id}`)}
-    >
-      <div className="p-5">
-        <div className="flex justify-between items-start mb-3">
-          <div className="flex items-center space-x-3">
-            {!isAnonymous && (
-              <div onClick={handleProfileClick}>
-                <Avatar
-                  src={user?._id === userId ? user.avatarUrl : 'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=150'}
-                  alt={userName}
-                  size="md"
-                />
-              </div>
-            )}
+    <article className="group relative overflow-hidden rounded-xl border border-line bg-surface shadow-card transition duration-200 hover:-translate-y-0.5 hover:shadow-pop motion-reduce:transform-none">
+      <span className={`absolute inset-y-0 left-0 w-1 ${MOODS[mood].stripe}`} aria-hidden />
 
-            <div>
-              <h2 className="text-lg font-bold font-serif mb-1">{title}</h2>
-              <div className="flex items-center text-sm text-gray-500">
-                <span>
-                  {isAnonymous ? 'Anonymous' : userName}
-                </span>
-                <span className="mx-1">•</span>
-                <span>{formatDistanceToNow(new Date(createdAt))}</span>
-              </div>
+      <div className="p-5 pl-6">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            {userId ? (
+              <Link to={`/profile/${userId._id}`} className="relative z-10 rounded-full" aria-label={`${userName}'s profile`}>
+                <Avatar src={userId.avatarUrl} name={userName} size="md" />
+              </Link>
+            ) : (
+              <Avatar name="Anonymous" size="md" />
+            )}
+            <div className="min-w-0 text-sm text-muted">
+              <span className="font-medium text-fg">{userName}</span>
+              <span className="mx-1" aria-hidden>
+                ·
+              </span>
+              <RelativeTime date={createdAt} />
             </div>
           </div>
-
-          <div className="flex space-x-2">
-            <MoodBadge mood={mood} />
-            {showPrivacy && <PrivacyBadge privacy={privacyLevel} />}
+          <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+            <MoodBadge mood={mood} size="sm" />
+            {showPrivacy && <PrivacyBadge privacy={privacyLevel} size="sm" />}
           </div>
         </div>
 
-        <p className={`mb-4 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-          {truncatedContent}
-        </p>
+        <h2 className="mb-2 font-serif text-lg font-bold leading-snug">
+          <Link to={`/dream/${_id}`} className="rounded after:absolute after:inset-0 after:content-['']">
+            {title}
+          </Link>
+        </h2>
 
-        <div className="flex flex-wrap gap-2 mb-4">
-          {tags.map(tag => (
-            <TagBadge
-              key={tag}
-              tag={tag}
-              onClick={(e) => handleTagClick(e as React.MouseEvent, tag)}
-            />
-          ))}
-        </div>
+        <p className="mb-4 line-clamp-3 whitespace-pre-line text-muted">{content}</p>
 
-        <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+        {tags.length > 0 && (
+          <div className="mb-4 flex flex-wrap gap-2">
+            {tags.map((tag) => (
+              <TagBadge key={tag} tag={tag} size="sm" />
+            ))}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between border-t border-line pt-2">
           <button
-            className={`
-              flex items-center space-x-1 px-2 py-1 rounded-full
-              ${isLiked ? 'text-red-500' : isDarkMode ? 'text-gray-300 hover:text-red-500' : 'text-gray-500 hover:text-red-500'}
-              transition-colors duration-200
-              ${!user && 'opacity-50 cursor-not-allowed'}
-            `}
+            type="button"
             onClick={handleLike}
-            disabled={!user}
+            aria-pressed={likedByMe}
+            aria-label={`${likedByMe ? 'Unlike' : 'Like'} (${likesCount})`}
+            className={`relative z-10 inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 transition-colors sm:min-h-9 ${
+              likedByMe ? 'text-red-500' : 'text-muted hover:text-red-500'
+            }`}
           >
-            <Heart className="w-5 h-5" fill={isLiked ? 'currentColor' : 'none'} />
-            <span>{dream.likes.length}</span>
+            <Heart className="h-5 w-5" fill={likedByMe ? 'currentColor' : 'none'} aria-hidden />
+            <span className="tabular-nums">{likesCount}</span>
           </button>
 
-          <button
-            className={`
-              flex items-center space-x-1 px-2 py-1 rounded-full
-              ${isDarkMode ? 'text-gray-300 hover:text-blue-500' : 'text-gray-500 hover:text-blue-500'}
-              transition-colors duration-200
-              ${!user && 'opacity-50 cursor-not-allowed'}
-            `}
-            onClick={handleComment}
-            disabled={!user}
+          <Link
+            to={`/dream/${_id}#comments`}
+            aria-label={`${comments.length} comments`}
+            className="relative z-10 inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-muted transition-colors hover:text-accent-text sm:min-h-9"
           >
-            <MessageSquare className="w-5 h-5" />
-            <span>{comments.length}</span>
-          </button>
+            <MessageSquare className="h-5 w-5" aria-hidden />
+            <span className="tabular-nums">{comments.length}</span>
+          </Link>
 
-          <button
-            className={`
-              flex items-center space-x-1 px-2 py-1 rounded-full
-              ${isDarkMode ? 'text-gray-300 hover:text-green-500' : 'text-gray-500 hover:text-green-500'}
-              transition-colors duration-200
-            `}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Share2 className="w-5 h-5" />
-          </button>
+          {privacyLevel !== 'private' ? <ShareButton dreamId={_id} title={title} /> : <span className="w-11" />}
         </div>
       </div>
-    </div>
+    </article>
   );
 };
 

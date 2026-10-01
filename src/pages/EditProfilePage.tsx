@@ -3,194 +3,120 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { ProfileUpdateData } from '../types';
-import { AlertTriangle } from 'lucide-react';
+import AccountSecurity from '../components/AccountSecurity';
+import EmojiAvatarPicker from '../components/EmojiAvatarPicker';
+import { Button } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
+import { Field, Input, Textarea } from '../components/ui/Field';
+import { useToast } from '../components/ui/Toast';
 
 const profileSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
-  bio: z.string().max(160, 'Bio must be less than 160 characters'),
-  location: z.string().max(100, 'Location must be less than 100 characters'),
-  website: z.string().url('Invalid URL').or(z.string().length(0)),
-  avatarUrl: z.string().url('Invalid URL').or(z.string().length(0)),
+  name: z.string().trim().min(2, 'Name must be at least 2 characters').max(50, 'Name must be at most 50 characters'),
+  bio: z.string().max(160, 'Bio must be at most 160 characters'),
+  location: z.string().max(100, 'Location must be at most 100 characters'),
+  website: z
+    .string()
+    .url('Enter a full URL, for example https://example.com')
+    .refine((v) => /^https?:/i.test(v), 'Website must start with http:// or https://')
+    .or(z.string().length(0)),
+  avatarUrl: z.string().url('Invalid URL').or(z.string().length(0))
 });
 
 const EditProfilePage: React.FC = () => {
+  useDocumentTitle('Edit profile');
   const navigate = useNavigate();
-  const { user, updateProfile, isDarkMode } = useApp();
-  
-  const { register, handleSubmit, formState: { errors } } = useForm<ProfileUpdateData>({
+  const toast = useToast();
+  const { user, updateProfile } = useAuth();
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    formState: { errors, isSubmitting, isDirty }
+  } = useForm<ProfileUpdateData>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
-      name: user?.name || '',
-      bio: user?.bio || '',
-      location: user?.location || '',
-      website: user?.website || '',
-      avatarUrl: user?.avatarUrl || '',
-    },
+      name: user?.name ?? '',
+      bio: user?.bio ?? '',
+      location: user?.location ?? '',
+      website: user?.website ?? '',
+      avatarUrl: user?.avatarUrl ?? ''
+    }
   });
-  
+
+  const bio = watch('bio') ?? '';
+  const avatarUrl = watch('avatarUrl');
+
   const onSubmit = async (data: ProfileUpdateData) => {
     try {
       await updateProfile(data);
+      toast.success('Profile updated');
       navigate('/profile');
     } catch (error) {
-      console.error('Profile update failed:', error);
+      toast.error(error instanceof Error ? error.message : 'Profile update failed');
     }
   };
-  
+
   return (
-    <div className={`max-w-2xl mx-auto px-4 py-8 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-      <h1 className="text-3xl font-serif font-bold mb-2">Edit Profile</h1>
-      <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-600'} mb-6`}>
-        Update your profile information and customize how others see you.
-      </p>
-      
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        <div>
-          <label htmlFor="name" className="block text-sm font-medium mb-1">
-            Name
-          </label>
-          <input
-            {...register('name')}
-            type="text"
-            className={`
-              w-full px-4 py-2 rounded-md border
-              ${isDarkMode 
-                ? 'bg-gray-700 border-gray-600 text-white' 
-                : 'bg-white border-gray-300 text-gray-900'
-              }
-              focus:outline-none focus:ring-2 focus:ring-purple-500
-            `}
-          />
-          {errors.name && (
-            <p className="mt-1 text-red-500 text-sm flex items-center">
-              <AlertTriangle className="w-4 h-4 mr-1" />
-              {errors.name.message}
-            </p>
-          )}
-        </div>
-        
-        <div>
-          <label htmlFor="bio" className="block text-sm font-medium mb-1">
-            Bio
-          </label>
-          <textarea
-            {...register('bio')}
-            rows={3}
-            className={`
-              w-full px-4 py-2 rounded-md border
-              ${isDarkMode 
-                ? 'bg-gray-700 border-gray-600 text-white' 
-                : 'bg-white border-gray-300 text-gray-900'
-              }
-              focus:outline-none focus:ring-2 focus:ring-purple-500
-              resize-none
-            `}
-          />
-          {errors.bio && (
-            <p className="mt-1 text-red-500 text-sm flex items-center">
-              <AlertTriangle className="w-4 h-4 mr-1" />
-              {errors.bio.message}
-            </p>
-          )}
-        </div>
-        
-        <div>
-          <label htmlFor="location" className="block text-sm font-medium mb-1">
-            Location
-          </label>
-          <input
-            {...register('location')}
-            type="text"
-            className={`
-              w-full px-4 py-2 rounded-md border
-              ${isDarkMode 
-                ? 'bg-gray-700 border-gray-600 text-white' 
-                : 'bg-white border-gray-300 text-gray-900'
-              }
-              focus:outline-none focus:ring-2 focus:ring-purple-500
-            `}
-          />
-          {errors.location && (
-            <p className="mt-1 text-red-500 text-sm flex items-center">
-              <AlertTriangle className="w-4 h-4 mr-1" />
-              {errors.location.message}
-            </p>
-          )}
-        </div>
-        
-        <div>
-          <label htmlFor="website" className="block text-sm font-medium mb-1">
-            Website
-          </label>
-          <input
-            {...register('website')}
-            type="url"
-            className={`
-              w-full px-4 py-2 rounded-md border
-              ${isDarkMode 
-                ? 'bg-gray-700 border-gray-600 text-white' 
-                : 'bg-white border-gray-300 text-gray-900'
-              }
-              focus:outline-none focus:ring-2 focus:ring-purple-500
-            `}
-          />
-          {errors.website && (
-            <p className="mt-1 text-red-500 text-sm flex items-center">
-              <AlertTriangle className="w-4 h-4 mr-1" />
-              {errors.website.message}
-            </p>
-          )}
-        </div>
-        
-        <div>
-          <label htmlFor="avatarUrl" className="block text-sm font-medium mb-1">
-            Avatar URL
-          </label>
-          <input
-            {...register('avatarUrl')}
-            type="url"
-            className={`
-              w-full px-4 py-2 rounded-md border
-              ${isDarkMode 
-                ? 'bg-gray-700 border-gray-600 text-white' 
-                : 'bg-white border-gray-300 text-gray-900'
-              }
-              focus:outline-none focus:ring-2 focus:ring-purple-500
-            `}
-          />
-          {errors.avatarUrl && (
-            <p className="mt-1 text-red-500 text-sm flex items-center">
-              <AlertTriangle className="w-4 h-4 mr-1" />
-              {errors.avatarUrl.message}
-            </p>
-          )}
-        </div>
-        
-        <div className="flex justify-end space-x-3">
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className={`
-              px-4 py-2 rounded-md
-              ${isDarkMode 
-                ? 'bg-gray-700 text-white hover:bg-gray-600' 
-                : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-              }
-              transition-colors duration-200
-            `}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors duration-200"
-          >
-            Save Changes
-          </button>
-        </div>
-      </form>
+    <div className="mx-auto max-w-2xl animate-fade-in">
+      <h1 className="mb-1 font-serif text-3xl font-bold">Edit profile</h1>
+      <p className="mb-8 text-muted">Update how others see you.</p>
+
+      <Card>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
+          <div>
+            <p className="mb-2 text-sm font-medium">Avatar</p>
+            <EmojiAvatarPicker
+              initialAvatarUrl={avatarUrl}
+              onAvatarChange={(url) => setValue('avatarUrl', url, { shouldDirty: true })}
+            />
+            {errors.avatarUrl && (
+              <p role="alert" className="mt-1 text-sm text-danger-text">
+                {errors.avatarUrl.message}
+              </p>
+            )}
+          </div>
+
+          <Field label="Name" error={errors.name?.message}>
+            {({ id, describedBy, invalid }) => (
+              <Input id={id} aria-describedby={describedBy} invalid={invalid} autoComplete="name" {...register('name')} />
+            )}
+          </Field>
+
+          <Field label="Bio" optional error={errors.bio?.message} counter={{ value: bio.length, max: 160 }}>
+            {({ id, describedBy, invalid }) => (
+              <Textarea id={id} aria-describedby={describedBy} invalid={invalid} rows={3} className="resize-none" {...register('bio')} />
+            )}
+          </Field>
+
+          <Field label="Location" optional error={errors.location?.message}>
+            {({ id, describedBy, invalid }) => (
+              <Input id={id} aria-describedby={describedBy} invalid={invalid} {...register('location')} />
+            )}
+          </Field>
+
+          <Field label="Website" optional error={errors.website?.message}>
+            {({ id, describedBy, invalid }) => (
+              <Input id={id} aria-describedby={describedBy} invalid={invalid} type="url" placeholder="https://" {...register('website')} />
+            )}
+          </Field>
+
+          <div className="flex justify-end gap-3">
+            <Button variant="secondary" onClick={() => navigate(-1)}>
+              Cancel
+            </Button>
+            <Button type="submit" loading={isSubmitting} disabled={!isDirty}>
+              Save changes
+            </Button>
+          </div>
+        </form>
+      </Card>
+
+      <AccountSecurity />
     </div>
   );
 };

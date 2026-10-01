@@ -1,3 +1,83 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Design tokens: "r g b" triplets so Tailwind can apply alpha (see tailwind.config.js). */
+:root {
+  --canvas: 247 246 252;
+  --surface: 255 255 255;
+  --surface-2: 243 241 250;
+  --line: 226 224 238;
+  --fg: 24 22 40;
+  --muted: 100 104 126;
+  --accent: 124 58 237;
+  --accent-hover: 109 40 217;
+  --accent-text: 109 40 217;
+  --accent-soft: 237 233 254;
+  --danger: 220 38 38;
+  --danger-text: 185 28 28;
+  --success-text: 21 128 61;
+  --shadow: 40 30 90;
+  color-scheme: light;
+}
+
+.dark {
+  --canvas: 10 12 26;
+  --surface: 21 24 44;
+  --surface-2: 32 36 62;
+  --line: 52 57 90;
+  --fg: 237 239 250;
+  --muted: 160 167 197;
+  --accent: 124 58 237;
+  --accent-hover: 139 92 246;
+  --accent-text: 196 181 253;
+  --accent-soft: 46 36 87;
+  --danger: 220 38 38;
+  --danger-text: 252 165 165;
+  --success-text: 134 239 172;
+  --shadow: 0 0 0;
+  color-scheme: dark;
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-canvas font-sans text-fg antialiased transition-colors duration-300;
+  }
+
+  /* A faint night sky in dark mode; text always sits on solid surfaces for contrast. */
+  .dark body {
+    background-image:
+      radial-gradient(1200px 500px at 15% -10%, rgb(124 58 237 / 0.18), transparent 60%),
+      radial-gradient(900px 400px at 100% 0%, rgb(59 130 246 / 0.12), transparent 55%);
+    background-attachment: fixed;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-accent ring-offset-2 ring-offset-canvas;
+  }
+
+  ::selection {
+    background: rgb(var(--accent) / 0.3);
+  }
+}
+
+@layer components {
+  .skeleton {
+    @apply animate-pulse rounded-md bg-surface-2;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

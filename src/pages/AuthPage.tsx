@@ -1,242 +1,211 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React from 'react';
+import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useApp } from '../context/AppContext';
+import { Check, Circle, Moon } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { LoginCredentials, RegisterData } from '../types';
-import { AlertTriangle } from 'lucide-react';
+import EmojiAvatarPicker from '../components/EmojiAvatarPicker';
+import { Button } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
+import { Field, Input, PasswordInput } from '../components/ui/Field';
+import { useToast } from '../components/ui/Toast';
 
 const loginSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  email: z.string().email('Enter a valid email address'),
+  password: z.string().min(1, 'Enter your password')
 });
 
-const registerSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-  confirmPassword: z.string(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-});
+const registerSchema = z
+  .object({
+    name: z.string().trim().min(2, 'Name must be at least 2 characters').max(50, 'Name must be at most 50 characters'),
+    email: z.string().email('Enter a valid email address'),
+    password: z
+      .string()
+      .min(8, 'At least 8 characters')
+      .max(72, 'At most 72 characters')
+      .regex(/[A-Za-z]/, 'Include a letter')
+      .regex(/\d/, 'Include a number'),
+    confirmPassword: z.string(),
+    avatarUrl: z.string().url('Invalid URL').or(z.string().length(0))
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ['confirmPassword']
+  });
 
-const AuthPage: React.FC = () => {
-  const [isLogin, setIsLogin] = useState(true);
-  const navigate = useNavigate();
-  const { login, register, isDarkMode } = useApp();
-  
-  const { register: registerForm, handleSubmit: handleLoginSubmit, formState: { errors: loginErrors } } = 
-    useForm<LoginCredentials>({
-      resolver: zodResolver(loginSchema)
-    });
-    
-  const { register: registerRegForm, handleSubmit: handleRegisterSubmit, formState: { errors: registerErrors } } = 
-    useForm<RegisterData>({
-      resolver: zodResolver(registerSchema)
-    });
-  
-  const onLogin = async (data: LoginCredentials) => {
+/** Live checklist so people see what is still missing while typing. */
+const PasswordRules: React.FC<{ value: string }> = ({ value }) => {
+  const rules = [
+    { ok: value.length >= 8 && value.length <= 72, label: '8-72 characters' },
+    { ok: /[A-Za-z]/.test(value), label: 'A letter' },
+    { ok: /\d/.test(value), label: 'A number' }
+  ];
+  return (
+    <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm" aria-label="Password requirements">
+      {rules.map((r) => (
+        <li key={r.label} className={`flex items-center gap-1 ${r.ok ? 'text-success' : 'text-muted'}`}>
+          {r.ok ? <Check className="h-4 w-4" aria-hidden /> : <Circle className="h-3 w-3" aria-hidden />}
+          {r.label}
+          <span className="sr-only">{r.ok ? ' (met)' : ' (not met)'}</span>
+        </li>
+      ))}
+    </ul>
+  );
+};
+
+const LoginForm: React.FC<{ onDone: () => void }> = ({ onDone }) => {
+  const { login } = useAuth();
+  const toast = useToast();
+  const {
+    register,
+    handleSubmit,
+    setError,
+    formState: { errors, isSubmitting }
+  } = useForm<LoginCredentials>({ resolver: zodResolver(loginSchema) });
+
+  const onSubmit = async (data: LoginCredentials) => {
     try {
       await login(data);
-      navigate('/');
+      toast.success('Welcome back!');
+      onDone();
     } catch (error) {
-      console.error('Login failed:', error);
+      setError('root', { message: error instanceof Error ? error.message : 'Login failed' });
     }
   };
-  
-  const onRegister = async (data: RegisterData) => {
-    try {
-      await register(data);
-      navigate('/');
-    } catch (error) {
-      console.error('Registration failed:', error);
-    }
-  };
-  
+
   return (
-    <div className={`min-h-screen flex items-center justify-center px-4 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
-      <div className={`max-w-md w-full space-y-8 ${isDarkMode ? 'bg-gray-800' : 'bg-white'} p-8 rounded-lg shadow-lg`}>
-        <div>
-          <h2 className="text-3xl font-bold font-serif text-center mb-8">
-            {isLogin ? 'Welcome Back' : 'Create Account'}
-          </h2>
-        </div>
-        
-        {isLogin ? (
-          <form className="space-y-6" onSubmit={handleLoginSubmit(onLogin)}>
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium mb-1">
-                Email
-              </label>
-              <input
-                {...registerForm('email')}
-                type="email"
-                className={`
-                  w-full px-4 py-2 rounded-md border
-                  ${isDarkMode 
-                    ? 'bg-gray-700 border-gray-600 text-white' 
-                    : 'bg-white border-gray-300 text-gray-900'
-                  }
-                  focus:outline-none focus:ring-2 focus:ring-purple-500
-                `}
-              />
-              {loginErrors.email && (
-                <p className="mt-1 text-red-500 text-sm flex items-center">
-                  <AlertTriangle className="w-4 h-4 mr-1" />
-                  {loginErrors.email.message}
-                </p>
-              )}
-            </div>
-            
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium mb-1">
-                Password
-              </label>
-              <input
-                {...registerForm('password')}
-                type="password"
-                className={`
-                  w-full px-4 py-2 rounded-md border
-                  ${isDarkMode 
-                    ? 'bg-gray-700 border-gray-600 text-white' 
-                    : 'bg-white border-gray-300 text-gray-900'
-                  }
-                  focus:outline-none focus:ring-2 focus:ring-purple-500
-                `}
-              />
-              {loginErrors.password && (
-                <p className="mt-1 text-red-500 text-sm flex items-center">
-                  <AlertTriangle className="w-4 h-4 mr-1" />
-                  {loginErrors.password.message}
-                </p>
-              )}
-            </div>
-            
-            <button
-              type="submit"
-              className="w-full py-2 px-4 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors duration-200"
-            >
-              Sign In
-            </button>
-          </form>
-        ) : (
-          <form className="space-y-6" onSubmit={handleRegisterSubmit(onRegister)}>
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium mb-1">
-                Name
-              </label>
-              <input
-                {...registerRegForm('name')}
-                type="text"
-                className={`
-                  w-full px-4 py-2 rounded-md border
-                  ${isDarkMode 
-                    ? 'bg-gray-700 border-gray-600 text-white' 
-                    : 'bg-white border-gray-300 text-gray-900'
-                  }
-                  focus:outline-none focus:ring-2 focus:ring-purple-500
-                `}
-              />
-              {registerErrors.name && (
-                <p className="mt-1 text-red-500 text-sm flex items-center">
-                  <AlertTriangle className="w-4 h-4 mr-1" />
-                  {registerErrors.name.message}
-                </p>
-              )}
-            </div>
-            
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium mb-1">
-                Email
-              </label>
-              <input
-                {...registerRegForm('email')}
-                type="email"
-                className={`
-                  w-full px-4 py-2 rounded-md border
-                  ${isDarkMode 
-                    ? 'bg-gray-700 border-gray-600 text-white' 
-                    : 'bg-white border-gray-300 text-gray-900'
-                  }
-                  focus:outline-none focus:ring-2 focus:ring-purple-500
-                `}
-              />
-              {registerErrors.email && (
-                <p className="mt-1 text-red-500 text-sm flex items-center">
-                  <AlertTriangle className="w-4 h-4 mr-1" />
-                  {registerErrors.email.message}
-                </p>
-              )}
-            </div>
-            
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium mb-1">
-                Password
-              </label>
-              <input
-                {...registerRegForm('password')}
-                type="password"
-                className={`
-                  w-full px-4 py-2 rounded-md border
-                  ${isDarkMode 
-                    ? 'bg-gray-700 border-gray-600 text-white' 
-                    : 'bg-white border-gray-300 text-gray-900'
-                  }
-                  focus:outline-none focus:ring-2 focus:ring-purple-500
-                `}
-              />
-              {registerErrors.password && (
-                <p className="mt-1 text-red-500 text-sm flex items-center">
-                  <AlertTriangle className="w-4 h-4 mr-1" />
-                  {registerErrors.password.message}
-                </p>
-              )}
-            </div>
-            
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium mb-1">
-                Confirm Password
-              </label>
-              <input
-                {...registerRegForm('confirmPassword')}
-                type="password"
-                className={`
-                  w-full px-4 py-2 rounded-md border
-                  ${isDarkMode 
-                    ? 'bg-gray-700 border-gray-600 text-white' 
-                    : 'bg-white border-gray-300 text-gray-900'
-                  }
-                  focus:outline-none focus:ring-2 focus:ring-purple-500
-                `}
-              />
-              {registerErrors.confirmPassword && (
-                <p className="mt-1 text-red-500 text-sm flex items-center">
-                  <AlertTriangle className="w-4 h-4 mr-1" />
-                  {registerErrors.confirmPassword.message}
-                </p>
-              )}
-            </div>
-            
-            <button
-              type="submit"
-              className="w-full py-2 px-4 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors duration-200"
-            >
-              Create Account
-            </button>
-          </form>
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
+      <Field label="Email" error={errors.email?.message}>
+        {({ id, describedBy, invalid }) => (
+          <Input id={id} aria-describedby={describedBy} invalid={invalid} type="email" autoComplete="email" {...register('email')} />
         )}
-        
-        <div className="mt-4 text-center">
-          <button
-            onClick={() => setIsLogin(!isLogin)}
-            className="text-purple-600 hover:text-purple-700 transition-colors duration-200"
-          >
-            {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
-          </button>
-        </div>
+      </Field>
+      <Field label="Password" error={errors.password?.message}>
+        {({ id, describedBy, invalid }) => (
+          <PasswordInput id={id} aria-describedby={describedBy} invalid={invalid} autoComplete="current-password" {...register('password')} />
+        )}
+      </Field>
+      {errors.root && (
+        <p role="alert" className="text-danger-text">
+          {errors.root.message}
+        </p>
+      )}
+      <Button type="submit" loading={isSubmitting} className="w-full" size="lg">
+        Sign in
+      </Button>
+    </form>
+  );
+};
+
+const RegisterForm: React.FC<{ onDone: () => void }> = ({ onDone }) => {
+  const { register: signUp } = useAuth();
+  const toast = useToast();
+  const {
+    register,
+    handleSubmit,
+    setError,
+    setValue,
+    watch,
+    formState: { errors, isSubmitting }
+  } = useForm<RegisterData>({ resolver: zodResolver(registerSchema), defaultValues: { avatarUrl: '' } });
+
+  const password = watch('password') ?? '';
+
+  const onSubmit = async (data: RegisterData) => {
+    try {
+      await signUp(data);
+      toast.success('Account created. Welcome to Dream Journal!');
+      onDone();
+    } catch (error) {
+      setError('root', { message: error instanceof Error ? error.message : 'Registration failed' });
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
+      <div>
+        <p className="mb-2 text-sm font-medium">Profile picture</p>
+        <EmojiAvatarPicker initialAvatarUrl={watch('avatarUrl')} onAvatarChange={(url) => setValue('avatarUrl', url)} />
       </div>
+      <Field label="Name" error={errors.name?.message}>
+        {({ id, describedBy, invalid }) => (
+          <Input id={id} aria-describedby={describedBy} invalid={invalid} autoComplete="name" {...register('name')} />
+        )}
+      </Field>
+      <Field label="Email" error={errors.email?.message}>
+        {({ id, describedBy, invalid }) => (
+          <Input id={id} aria-describedby={describedBy} invalid={invalid} type="email" autoComplete="email" {...register('email')} />
+        )}
+      </Field>
+      <div>
+        <Field label="Password">
+          {({ id, invalid }) => (
+            <PasswordInput id={id} invalid={invalid} autoComplete="new-password" {...register('password')} />
+          )}
+        </Field>
+        <PasswordRules value={password} />
+      </div>
+      <Field label="Confirm password" error={errors.confirmPassword?.message}>
+        {({ id, describedBy, invalid }) => (
+          <PasswordInput id={id} aria-describedby={describedBy} invalid={invalid} autoComplete="new-password" {...register('confirmPassword')} />
+        )}
+      </Field>
+      {errors.root && (
+        <p role="alert" className="text-danger-text">
+          {errors.root.message}
+        </p>
+      )}
+      <Button type="submit" loading={isSubmitting} className="w-full" size="lg">
+        Create account
+      </Button>
+    </form>
+  );
+};
+
+const AuthPage: React.FC = () => {
+  const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { isAuthenticated } = useAuth();
+
+  const isLogin = params.get('register') !== 'true';
+  useDocumentTitle(isLogin ? 'Sign in' : 'Create account');
+
+  // Send people back to where they were heading before being asked to sign in.
+  const from = (location.state as { from?: string } | null)?.from ?? '/';
+  const goBack = () => navigate(from, { replace: true });
+
+  if (isAuthenticated) return <Navigate to={from} replace />;
+
+  return (
+    <div className="mx-auto grid max-w-4xl items-start gap-8 md:grid-cols-2 md:pt-6">
+      <div className="hidden md:block">
+        <Moon className="mb-4 h-10 w-10 text-accent-text" aria-hidden />
+        <h2 className="mb-3 font-serif text-3xl font-bold">Remember more. Share what you want.</h2>
+        <ul className="space-y-3 text-muted">
+          <li>Keep a private journal of your dreams.</li>
+          <li>Share some publicly, or anonymously.</li>
+          <li>Find patterns with moods and tags.</li>
+        </ul>
+      </div>
+
+      <Card>
+        <h1 className="mb-6 text-center font-serif text-3xl font-bold">{isLogin ? 'Welcome back' : 'Create account'}</h1>
+        {isLogin ? <LoginForm onDone={goBack} /> : <RegisterForm onDone={goBack} />}
+        <p className="mt-6 text-center text-sm text-muted">
+          {isLogin ? "Don't have an account? " : 'Already have an account? '}
+          <button
+            type="button"
+            onClick={() => setParams(isLogin ? { register: 'true' } : {}, { replace: true })}
+            className="font-medium text-accent-text hover:underline"
+          >
+            {isLogin ? 'Sign up' : 'Sign in'}
+          </button>
+        </p>
+      </Card>
     </div>
   );
 };
