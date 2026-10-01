@@ -66,7 +66,7 @@ const AdminAppealPage: React.FC = () => {
     );
   }
 
-  const { appeal, author, content, reasons } = detail;
+  const { appeal, author, content, reasons, target, context } = detail;
   const isAccount = appeal.targetType === 'account';
   const open = appeal.status === 'open';
   const blockedReason = isAccount && !isAdmin
@@ -130,7 +130,22 @@ const AdminAppealPage: React.FC = () => {
             ) : (
               <>
                 {content.title && appeal.targetType === 'dream' && <p className="mb-1 font-medium">{content.title}</p>}
+                {context && (
+                  <div className="mb-3 rounded-lg border border-line p-3 text-sm text-muted">
+                    <p className="font-medium text-fg">In the dream &ldquo;{context.dreamTitle}&rdquo;</p>
+                    <p className="line-clamp-3 whitespace-pre-line">{context.dreamExcerpt}</p>
+                    {context.parentExcerpt && <p className="mt-2 border-l-2 border-line pl-3">Replying to: {context.parentExcerpt}</p>}
+                  </div>
+                )}
                 <p className="whitespace-pre-line break-words rounded-lg bg-surface-2 p-3">{content.text || 'No text available.'}</p>
+                {target && (
+                  <Link
+                    to={`/admin/case?dream=${target.dreamId}${target.commentId ? `&comment=${target.commentId}` : ''}`}
+                    className="mt-3 inline-flex min-h-11 items-center text-sm font-medium text-accent-text hover:underline"
+                  >
+                    Open the full case: reports, author history
+                  </Link>
+                )}
                 <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
                   <div>
                     <dt className="text-muted">Told to the author</dt>

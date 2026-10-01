@@ -6,6 +6,7 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useDraftAutosave } from '../hooks/useDraftAutosave';
 import VoiceInputButton from '../components/VoiceInputButton';
 import { Button } from '../components/ui/Button';
+import { Page } from '../components/ui/Page';
 import { Textarea } from '../components/ui/Field';
 import { useToast } from '../components/ui/Toast';
 
@@ -84,11 +85,11 @@ const QuickCapturePage: React.FC = () => {
     );
 
   return (
-    <div className="mx-auto max-w-2xl animate-fade-in">
+    <Page width="narrow">
       <div className="mb-6 text-center">
         <Moon className="mx-auto mb-2 h-8 w-8 text-accent-text" aria-hidden />
-        <h1 className="font-serif text-3xl font-bold">Just woke up?</h1>
-        <p className="text-muted">Write or say what you remember, before it fades. Details can wait.</p>
+        <h1 className="page-title">Just woke up?</h1>
+        <p className="mt-1.5 text-muted">Write or say what you remember, before it fades. Details can wait.</p>
       </div>
 
       <Textarea
@@ -125,7 +126,7 @@ const QuickCapturePage: React.FC = () => {
         Voice input uses your browser&apos;s speech recognition, which may send the audio to its provider (for example Google in Chrome).
         Nothing is sent to us until you save.
       </p>
-    </div>
+    </Page>
   );
 };
 

@@ -7,6 +7,7 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { ButtonLink } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Skeleton } from '../components/ui/Skeleton';
+import { Page, PageHeader } from '../components/ui/Page';
 
 const EditDreamPage: React.FC = () => {
   useDocumentTitle('Edit dream');
@@ -53,8 +54,8 @@ const EditDreamPage: React.FC = () => {
   }
 
   return (
-    <div className="mx-auto max-w-2xl animate-fade-in">
-      <h1 className="mb-8 font-serif text-3xl font-bold">{dream.status === 'draft' ? 'Continue your draft' : 'Edit dream'}</h1>
+    <Page width="narrow">
+      <PageHeader title={dream.status === 'draft' ? 'Continue your draft' : 'Edit dream'} />
       <DreamForm
         editMode
         dreamId={dream._id}
@@ -68,7 +69,7 @@ const EditDreamPage: React.FC = () => {
           mood: dream.mood
         }}
       />
-    </div>
+    </Page>
   );
 };
 

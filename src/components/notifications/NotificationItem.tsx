@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AtSign, CornerDownRight, Heart, MessageSquare, ShieldAlert, X } from 'lucide-react';
+import { AtSign, CornerDownRight, Gavel, Heart, MessageSquare, ShieldAlert, X } from 'lucide-react';
 import { reasonLabel } from '../../lib/reports';
 import { AppNotification, ModerationNotice } from '../../types';
 import AppealDialog from '../moderation/AppealDialog';
@@ -21,11 +21,13 @@ const ICONS = {
   reply: CornerDownRight,
   mention: AtSign,
   like: Heart,
-  moderation: ShieldAlert
+  moderation: ShieldAlert,
+  appeal: Gavel
 } as const;
 
 /** Where clicking a notification should lead (null when there is nothing left to open). */
 export const notificationTarget = (n: AppNotification): string | null => {
+  if (n.appeal) return `/admin/appeals/${n.appeal._id}`;
   if (!n.dream) return null;
   return n.commentId ? `/dream/${n.dream._id}#comment-${n.commentId}` : `/dream/${n.dream._id}`;
 };
@@ -57,7 +59,18 @@ const APPEAL_LABEL = {
   overturned: 'Appeal accepted.'
 } as const;
 
+const AppealSummary: React.FC<{ a: NonNullable<AppNotification['appeal']> }> = ({ a }) => {
+  const who = <strong>{a.authorName || 'Someone'}</strong>;
+  if (a.targetType === 'account') return <>{who} appealed their suspension</>;
+  return (
+    <>
+      {who} appealed the removal of their {a.targetType} <Quote>{a.title || 'Untitled'}</Quote>
+    </>
+  );
+};
+
 const Summary: React.FC<{ n: AppNotification }> = ({ n }) => {
+  if (n.appeal) return <AppealSummary a={n.appeal} />;
   if (n.moderation) return <ModerationSummary m={n.moderation} />;
 
   const who = <strong>{n.actor?.name ?? 'Someone'}</strong>;
@@ -83,6 +96,7 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification: n, on
   const Icon = ICONS[n.type];
   const target = notificationTarget(n);
   const m = n.moderation;
+  const a = n.appeal;
   const [appealing, setAppealing] = useState(false);
 
   const summary = <Summary n={n} />;
@@ -94,7 +108,7 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification: n, on
       }`}
     >
       <div className="relative shrink-0">
-        {m ? (
+        {m || a ? (
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-200">
             <Icon className="h-5 w-5" aria-hidden />
           </span>
@@ -138,6 +152,15 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification: n, on
                 Appeal this decision
               </Button>
             )}
+          </div>
+        )}
+
+        {a && (
+          <div className="mt-2 space-y-1">
+            {a.excerpt && <p className="line-clamp-2 whitespace-pre-line rounded-lg bg-surface-2 p-2 text-muted">{a.excerpt}</p>}
+            <p className="font-medium text-accent-text">
+              {a.status === 'open' ? 'Waiting for a decision' : a.status === 'overturned' ? 'Accepted' : 'Declined'}
+            </p>
           </div>
         )}
 

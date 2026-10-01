@@ -11,6 +11,7 @@ import DreamCard from '../components/DreamCard';
 import Avatar from '../components/ui/Avatar';
 import { Button, ButtonLink } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { Page } from '../components/ui/Page';
 import { EmptyState } from '../components/ui/EmptyState';
 import { DreamGridSkeleton } from '../components/ui/Skeleton';
 
@@ -53,13 +54,13 @@ const ProfilePage: React.FC = () => {
   const counts = list.meta as MyDreamsPage['counts'] | undefined;
 
   return (
-    <div className="animate-fade-in">
+    <Page>
       <Card className="mb-8">
         <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
           <div className="flex items-start gap-4">
             <Avatar src={user.avatarUrl} name={user.name} size="xl" />
             <div className="min-w-0">
-              <h1 className="font-serif text-2xl font-bold">{user.name}</h1>
+              <h1 className="page-title text-3xl">{user.name}</h1>
               {user.bio && <p className="mt-1 max-w-prose text-muted">{user.bio}</p>}
               <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
                 <li className="flex items-center gap-1">
@@ -137,9 +138,9 @@ const ProfilePage: React.FC = () => {
         ) : (
           <>
             {list.items.length > 0 && (
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
                 {list.items.map((dream) => (
-                  <DreamCard key={dream._id} dream={dream} showPrivacy={tab === 'all' || tab === 'draft'} />
+                  <DreamCard key={dream._id} dream={dream} showPrivacy={tab === 'all' || tab === 'draft'} showAuthor={false} />
                 ))}
               </div>
             )}
@@ -176,7 +177,7 @@ const ProfilePage: React.FC = () => {
           </>
         )}
       </div>
-    </div>
+    </Page>
   );
 };
 

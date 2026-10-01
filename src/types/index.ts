@@ -141,7 +141,7 @@ export interface Comment {
   moderation: ModerationInfo | null;
 }
 
-export type NotificationType = 'comment' | 'reply' | 'mention' | 'like' | 'moderation';
+export type NotificationType = 'comment' | 'reply' | 'mention' | 'like' | 'moderation' | 'appeal';
 
 export type ModerationEvent = 'removed' | 'hidden' | 'restored' | 'appeal_upheld' | 'appeal_overturned';
 
@@ -170,6 +170,15 @@ export interface AppNotification {
   commentId: string | null;
   /** present when type is `moderation` */
   moderation?: ModerationNotice;
+  /** present when type is `appeal` (staff only) */
+  appeal?: {
+    _id: string;
+    targetType: 'dream' | 'comment' | 'account';
+    title: string;
+    excerpt: string;
+    authorName: string;
+    status: 'open' | 'upheld' | 'overturned';
+  };
 }
 
 export interface AuthState {

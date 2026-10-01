@@ -84,7 +84,7 @@ const AdminCasePage: React.FC = () => {
     );
   }
 
-  const { target, author, reports } = detail;
+  const { target, author, reports, appeal } = detail;
   const openReports = reports.filter((r) => r.status === 'open');
   const isOpen = openReports.length > 0;
   const authorIsStaff = author?.role === 'admin' || (author?.role === 'moderator' && !isAdmin);
@@ -135,6 +135,19 @@ const AdminCasePage: React.FC = () => {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
         <div className="space-y-6">
+          {appeal && (
+            <p role="status" className="flex flex-wrap items-center gap-x-2 rounded-xl bg-accent-soft p-4 text-accent-text">
+              <span>
+                {appeal.status === 'open'
+                  ? 'The author appealed the decision on this content.'
+                  : `The author appealed this decision. The appeal was ${appeal.status === 'overturned' ? 'accepted' : 'declined'}.`}
+              </span>
+              <Link to={`/admin/appeals/${appeal._id}`} className="font-medium underline">
+                {appeal.status === 'open' ? 'Review the appeal' : 'See the appeal'}
+              </Link>
+            </p>
+          )}
+
           <Card as="section" aria-labelledby="content-title">
             <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
               <h2 id="content-title" className="font-serif text-xl font-bold">

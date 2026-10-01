@@ -9,6 +9,7 @@ import { Button } from './ui/Button';
 import VoiceInputButton from './VoiceInputButton';
 import { Chip } from './ui/Chip';
 import { useConfirm } from './ui/Confirm';
+import { Card } from './ui/Card';
 import { Field, Input, Textarea } from './ui/Field';
 import { useToast } from './ui/Toast';
 
@@ -209,29 +210,43 @@ const DreamForm: React.FC<DreamFormProps> = ({ editMode = false, dreamId, initia
   const publishLabel = editMode && initialStatus === 'published' ? 'Update dream' : 'Publish';
 
   return (
-    <form onSubmit={handlePublish} className="space-y-8" noValidate>
-      <Field label="What did you dream?" error={errors.content} counter={{ value: values.content.length, max: LIMITS.content }}>
-        {({ id, describedBy, invalid }) => (
-          <>
-          <div className="mb-2">
-            <VoiceInputButton
-              onText={(text) => set('content', values.content && !/\s$/.test(values.content) ? `${values.content} ${text}` : `${values.content}${text}`)}
-            />
+    <form onSubmit={handlePublish} className="space-y-6" noValidate>
+      <Card as="section" aria-labelledby="dream-text-title">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 id="dream-text-title" className="section-title">
+              Your dream
+            </h2>
+            <p className="meta">Write whatever you remember, in any order.</p>
           </div>
-          <Textarea
-            id={id}
-            aria-describedby={describedBy}
-            invalid={invalid}
-            value={values.content}
-            onChange={(e) => set('content', e.target.value)}
-            placeholder="Write down everything you remember: places, people, feelings…"
-            rows={10}
-            autoFocus={!editMode}
-            className="resize-y text-base leading-relaxed"
+          <VoiceInputButton
+            onText={(text) => set('content', values.content && !/\s$/.test(values.content) ? `${values.content} ${text}` : `${values.content}${text}`)}
           />
-          </>
-        )}
-      </Field>
+        </div>
+        <Field label="What did you dream?" error={errors.content} counter={{ value: values.content.length, max: LIMITS.content }}>
+          {({ id, describedBy, invalid }) => (
+            <Textarea
+              id={id}
+              aria-describedby={describedBy}
+              invalid={invalid}
+              value={values.content}
+              onChange={(e) => set('content', e.target.value)}
+              placeholder="Write down everything you remember: places, people, feelings…"
+              rows={10}
+              autoFocus={!editMode}
+              className="resize-y font-reading text-lg leading-relaxed"
+            />
+          )}
+        </Field>
+      </Card>
+
+      <Card as="section" aria-labelledby="dream-details-title" className="space-y-7">
+        <div>
+          <h2 id="dream-details-title" className="section-title">
+            Details
+          </h2>
+          <p className="meta">Everything here is optional except who can see it.</p>
+        </div>
 
       <Field
         label="Title"
@@ -253,7 +268,7 @@ const DreamForm: React.FC<DreamFormProps> = ({ editMode = false, dreamId, initia
       </Field>
 
       <fieldset>
-        <legend className="mb-2 text-sm font-medium">How did it feel?</legend>
+        <legend className="mb-2.5 text-sm font-semibold">How did it feel?</legend>
         <div className="flex flex-wrap gap-2">
           {MOOD_LIST.map((m) => {
             const { Icon, label } = MOODS[m];
@@ -268,7 +283,7 @@ const DreamForm: React.FC<DreamFormProps> = ({ editMode = false, dreamId, initia
       </fieldset>
 
       <fieldset>
-        <legend className="mb-2 text-sm font-medium">Who can see it once published?</legend>
+        <legend className="mb-2.5 text-sm font-semibold">Who can see it once published?</legend>
         <div className="grid gap-3 sm:grid-cols-3">
           {PRIVACY_LIST.map((level) => {
             const { Icon, label, description } = PRIVACY[level];
@@ -353,6 +368,8 @@ const DreamForm: React.FC<DreamFormProps> = ({ editMode = false, dreamId, initia
           </div>
         )}
       </Field>
+
+      </Card>
 
       {errors.form && (
         <p role="alert" className="text-danger-text">

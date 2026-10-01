@@ -179,7 +179,10 @@ export default ({ config, schemas }) => {
         AuditLog.countDocuments({ targetUserId: authorId, action: 'user_suspended' })
       ]);
 
+      const latestAppeal = await Appeal.findOne({ dreamId, commentId: commentId ?? null, targetType }).sort({ createdAt: -1 }).select('status createdAt');
+
       res.json({
+        appeal: latestAppeal ? { _id: String(latestAppeal._id), status: latestAppeal.status, createdAt: latestAppeal.createdAt } : null,
         target: {
           type: targetType,
           dreamId,

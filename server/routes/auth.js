@@ -10,6 +10,7 @@ import {
 } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { validate } from '../utils/validation.js';
+import { notifyStaffOfAppeal } from '../services/notifications.js';
 import { serializeUser } from '../utils/serialize.js';
 
 export default ({ config, schemas, authLimiter }) => {
@@ -86,12 +87,13 @@ export default ({ config, schemas, authLimiter }) => {
         return res.status(409).json({ message: 'Your last appeal was declined. You can appeal again after 30 days.' });
       }
 
-      await Appeal.create({
+      const appeal = await Appeal.create({
         userId: user._id,
         targetType: 'account',
         message,
         snapshot: { moderationMessage: user.suspensionReason }
       });
+      await notifyStaffOfAppeal({ appeal, authorName: user.name });
       res.status(201).json({ message: 'Your appeal was sent. An administrator will review it.' });
     })
   );

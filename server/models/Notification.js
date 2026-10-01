@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const { ObjectId } = mongoose.Schema.Types;
 
-export const NOTIFICATION_TYPES = ['comment', 'reply', 'mention', 'like', 'moderation'];
+export const NOTIFICATION_TYPES = ['comment', 'reply', 'mention', 'like', 'moderation', 'appeal'];
 
 /** What happened, for `moderation` notifications. */
 export const MODERATION_EVENTS = ['removed', 'hidden', 'restored', 'appeal_upheld', 'appeal_overturned'];
@@ -34,6 +34,16 @@ const notificationSchema = new mongoose.Schema(
       excerpt: { type: String, default: '', maxlength: 300 },
       message: { type: String, default: '', maxlength: 300 },
       reasons: [{ type: String }]
+    },
+    /**
+     * `appeal` notifications tell staff that an author appealed a decision (`appealId` points at the appeal). They carry
+     * their own copy of what is needed to recognise it in the inbox.
+     */
+    staff: {
+      targetType: { type: String, enum: ['dream', 'comment', 'account'] },
+      title: { type: String, default: '' },
+      excerpt: { type: String, default: '', maxlength: 300 },
+      authorName: { type: String, default: '' }
     },
     /** set once the author appealed the decision this notification is about */
     appealId: { type: ObjectId, ref: 'Appeal', default: null },

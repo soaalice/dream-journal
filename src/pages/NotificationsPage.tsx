@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Bell, CheckCheck, CloudOff } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { Chip } from '../components/ui/Chip';
 import { api } from '../lib/api';
 import { AppNotification } from '../types';
 import { useNotifications } from '../context/NotificationsContext';
@@ -10,8 +12,12 @@ import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Skeleton } from '../components/ui/Skeleton';
 import { useToast } from '../components/ui/Toast';
+import { Page, PageHeader } from '../components/ui/Page';
+
+type Group = 'all' | 'activity' | 'moderation' | 'appeals';
 
 interface NotificationPage {
+  unreadAppeals: number;
   notifications: AppNotification[];
   hasMore: boolean;
   nextCursor: string | null;
@@ -25,16 +31,22 @@ const NotificationsPage: React.FC = () => {
   useDocumentTitle('Notifications');
   const toast = useToast();
   const { unreadCount, setUnreadCount } = useNotifications();
+  const role = useAuth().user?.role;
+  const isStaff = role === 'admin' || role === 'moderator';
+  const [group, setGroup] = useState<Group>('all');
+  const [unreadOnly, setUnreadOnly] = useState(false);
+  const [unreadAppeals, setUnreadAppeals] = useState(0);
 
   const list = useInfiniteList<Row>(async (cursor, signal) => {
-    const page = await api<NotificationPage>('/notifications', { query: { limit: 20, before: cursor ?? undefined }, signal });
+    const page = await api<NotificationPage>('/notifications', { query: { limit: 20, before: cursor ?? undefined, group, unread: unreadOnly ? '1' : '0' }, signal });
     setUnreadCount(page.unreadCount);
+    setUnreadAppeals(page.unreadAppeals);
     return {
       items: page.notifications.map((n) => ({ ...n, wasUnread: !n.read })),
       hasMore: page.hasMore,
       next: page.nextCursor
     };
-  }, []);
+  }, [group, unreadOnly]);
 
   const rows = list.items;
 
@@ -87,7 +99,7 @@ const NotificationsPage: React.FC = () => {
   const renderGroup = (title: string, group: Row[]) =>
     group.length > 0 && (
       <section aria-label={title} className="mb-8">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">{title}</h2>
+        <h2 className="eyebrow mb-3">{title}</h2>
         <ul className="space-y-3">
           {group.map((n) => (
             <NotificationItem key={n._id} notification={n} onOpen={handleOpen} onDismiss={handleDismiss} onAppealed={handleAppealed} />
@@ -97,17 +109,43 @@ const NotificationsPage: React.FC = () => {
     );
 
   return (
-    <div className="mx-auto max-w-2xl animate-fade-in">
-      <div className="mb-6 flex items-end justify-between gap-3">
-        <div>
-          <h1 className="font-serif text-3xl font-bold">Notifications</h1>
-          <p className="text-muted">{unreadCount > 0 ? `${unreadCount} unread` : 'You are all caught up'}</p>
+    <Page width="narrow">
+      <PageHeader
+        title="Notifications"
+        description={unreadCount > 0 ? `${unreadCount} unread` : 'You are all caught up'}
+        actions={
+          <Button variant="secondary" size="sm" onClick={handleMarkAll} disabled={unreadCount === 0}>
+            <CheckCheck className="h-4 w-4" aria-hidden />
+            Mark all as read
+          </Button>
+        }
+      />
+
+      {isStaff && (
+        <div className="mb-6 flex flex-wrap items-center gap-2" role="group" aria-label="Filter notifications">
+          {(
+            [
+              ['all', 'All'],
+              ['appeals', 'Appeals'],
+              ['activity', 'Activity'],
+              ['moderation', 'Decisions on my content']
+            ] as Array<[Group, string]>
+          ).map(([value, label]) => (
+            <Chip key={value} selected={group === value} onClick={() => setGroup(value)}>
+              {label}
+              {value === 'appeals' && unreadAppeals > 0 && (
+                <span className="ml-1.5 rounded-full bg-accent px-1.5 text-xs text-white tabular-nums" aria-label={`${unreadAppeals} unread`}>
+                  {unreadAppeals}
+                </span>
+              )}
+            </Chip>
+          ))}
+          <span className="mx-1 h-5 w-px bg-line" aria-hidden />
+          <Chip selected={unreadOnly} onClick={() => setUnreadOnly((v) => !v)}>
+            Unread only
+          </Chip>
         </div>
-        <Button variant="secondary" size="sm" onClick={handleMarkAll} disabled={unreadCount === 0}>
-          <CheckCheck className="h-4 w-4" aria-hidden />
-          Mark all as read
-        </Button>
-      </div>
+      )}
 
       {list.error && rows.length === 0 ? (
         <EmptyState
@@ -134,7 +172,7 @@ const NotificationsPage: React.FC = () => {
             <EmptyState
               icon={<Bell className="h-12 w-12" />}
               title="No notifications yet"
-              description="You will see comments, replies, mentions and likes here."
+              description={group === 'appeals' ? 'No appeals to show.' : unreadOnly ? 'Nothing unread here.' : 'You will see comments, replies, mentions and likes here.'}
             />
           )}
 
@@ -148,7 +186,7 @@ const NotificationsPage: React.FC = () => {
           <div ref={list.sentinelRef} aria-hidden className="h-1" />
         </>
       )}
-    </div>
+    </Page>
   );
 };
 

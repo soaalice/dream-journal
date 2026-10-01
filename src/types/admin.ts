@@ -52,6 +52,8 @@ export interface AdminReportRow {
 }
 
 export interface AdminCaseDetail {
+  /** the author's latest appeal about this content, if any */
+  appeal: { _id: string; status: AppealStatus; createdAt: string } | null;
   target: {
     type: 'dream' | 'comment';
     dreamId: string;
@@ -148,6 +150,10 @@ export interface AppealDetail {
   author: { name: string; email: string | null; joinedAt: string; suspended: boolean; suspensionReason: string } | null;
   content: { exists: boolean; title: string; text: string; moderationState: 'visible' | 'hidden' | 'removed' | null; moderationMessage: string };
   reasons: ReportReason[];
+  /** where the content lives in the reports queue; null for an account appeal */
+  target: { dreamId: string; commentId: string | null } | null;
+  /** for a comment: the dream (and the comment it answers) around it */
+  context: { dreamTitle: string; dreamExcerpt: string; parentExcerpt: string } | null;
 }
 
 export interface StaffMember {

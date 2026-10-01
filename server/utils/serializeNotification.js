@@ -13,6 +13,29 @@ const idOf = (value) => String(value?._id ?? value);
 export const serializeNotification = (n, viewerId, blocked = new Set()) => {
   const dream = n.dreamId && n.dreamId.title !== undefined ? n.dreamId : null;
 
+  // Staff are told about appeals: the appeal itself is in the moderation panel.
+  if (n.type === 'appeal') {
+    const s = n.staff ?? {};
+    return {
+      _id: String(n._id),
+      type: 'appeal',
+      read: Boolean(n.readAt),
+      createdAt: n.updatedAt ?? n.createdAt,
+      count: 1,
+      actor: null,
+      dream: null,
+      commentId: null,
+      appeal: {
+        _id: idOf(n.appealId),
+        targetType: s.targetType,
+        title: s.title ?? '',
+        excerpt: s.excerpt ?? '',
+        authorName: s.authorName ?? '',
+        status: n.appealId?.status ?? 'open'
+      }
+    };
+  }
+
   // Moderation notices are addressed to the author and carry their own copy of the text, so they do not depend
   // on the content still being visible (or existing).
   if (n.type === 'moderation') {

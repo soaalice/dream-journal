@@ -6,9 +6,14 @@ import { authenticate, requireStaff } from '../middleware/auth.js';
 import { asyncHandler, HttpError } from '../utils/asyncHandler.js';
 import { objectId, validate } from '../utils/validation.js';
 import { audit } from '../services/audit.js';
+import { markAppealNotificationsRead } from '../services/notifications.js';
 import { reasonsFor, setModerationState, tellAuthor } from '../services/moderation.js';
 
 const idOf = (value) => String(value?._id ?? value);
+const parentOf = (comment, dream) => {
+  const parent = comment?.parentId ? dream.comments.id(comment.parentId) : null;
+  return parent && !parent.deleted ? excerpt(parent.content, 300) : '';
+};
 const excerpt = (text = '', n = 200) => (text.length > n ? `${text.slice(0, n)}…` : text);
 
 /**
@@ -98,6 +103,13 @@ export default ({ config, schemas }) => {
               suspensionReason: author.suspensionReason
             }
           : null,
+        /** where to find the content in the reports queue (open the whole case) */
+        target: appeal.targetType === 'account' ? null : { dreamId: String(appeal.dreamId), commentId: appeal.commentId ? String(appeal.commentId) : null },
+        /** for a comment: the dream it belongs to, so it can be read in context */
+        context:
+          appeal.targetType === 'comment' && dream
+            ? { dreamTitle: dream.title, dreamExcerpt: excerpt(dream.content, 400), parentExcerpt: parentOf(comment, dream) }
+            : null,
         content: {
           exists: Boolean(live),
           title: dream?.title ?? appeal.snapshot?.title ?? '',
@@ -158,6 +170,7 @@ export default ({ config, schemas }) => {
       appeal.resolutionNote = note;
       await appeal.save();
 
+      await markAppealNotificationsRead(appeal._id);
       await audit(adminId, { ...base, action: decision === 'overturned' ? 'appeal_overturned' : 'appeal_upheld' });
 
       // Account appeals cannot be answered with a notification (the person cannot sign in); they see the result at login.

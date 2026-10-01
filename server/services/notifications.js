@@ -11,6 +11,7 @@
  */
 import Dream from '../models/Dream.js';
 import Notification from '../models/Notification.js';
+import User from '../models/User.js';
 
 const idOf = (value) => String(value?._id ?? value);
 
@@ -106,7 +107,34 @@ export const notifyModeration = safely('moderation', async ({ userId, event, kin
   });
 });
 
-const NOT_MODERATION = { type: { $ne: 'moderation' } };
+/**
+ * An author appealed: moderators and administrators are told so the appeal does not sit unseen. Appeals against a
+ * suspension go to administrators only (moderators cannot decide them), and a moderator is not asked to review an
+ * appeal against their own decision. Suspended staff are skipped.
+ */
+export const notifyStaffOfAppeal = safely('staffAppeal', async ({ appeal, authorName, excludeUserId = null }) => {
+  const roles = appeal.targetType === 'account' ? ['admin'] : ['moderator', 'admin'];
+  const staff = await User.find({ role: { $in: roles }, suspendedAt: null }).select('_id role');
+  const recipients = staff.filter((u) => u.role === 'admin' || idOf(u) !== idOf(excludeUserId));
+  if (recipients.length === 0) return;
+
+  const staffInfo = {
+    targetType: appeal.targetType,
+    title: appeal.snapshot?.title ?? '',
+    excerpt: (appeal.targetType === 'account' ? appeal.message : appeal.snapshot?.content ?? '').slice(0, 300),
+    authorName
+  };
+  await Notification.insertMany(
+    recipients.map((u) => ({ userId: u._id, type: 'appeal', actorId: null, appealId: appeal._id, staff: staffInfo }))
+  );
+});
+
+/** Once an appeal is decided, the staff notifications about it are done with. */
+export const markAppealNotificationsRead = safely('markAppealRead', (appealId) =>
+  Notification.updateMany({ type: 'appeal', appealId, readAt: null }, { $set: { readAt: new Date() } }, { timestamps: false })
+);
+
+const NOT_MODERATION = { type: { $nin: ['moderation', 'appeal'] } };
 
 export const removeForDream = safely('removeForDream', (dreamId) => Notification.deleteMany({ dreamId, ...NOT_MODERATION }));
 

@@ -11,6 +11,7 @@ import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Skeleton } from '../components/ui/Skeleton';
 import { useToast } from '../components/ui/Toast';
+import { Page, PageHeader } from '../components/ui/Page';
 
 const PAGE_SIZE = 20;
 
@@ -37,16 +38,16 @@ const BlockedUsersPage: React.FC = () => {
   };
 
   return (
-    <div className="mx-auto max-w-2xl animate-fade-in">
+    <Page width="narrow">
       <Link to="/profile/edit" className="mb-4 inline-flex min-h-11 items-center gap-1 text-sm text-muted hover:text-fg">
         <ArrowLeft className="h-4 w-4" aria-hidden />
         Profile settings
       </Link>
 
-      <h1 className="font-serif text-3xl font-bold">Blocked users</h1>
-      <p className="mb-6 text-muted">
-        Blocked people cannot see your dreams or comments, and you cannot see theirs. They are not told they were blocked.
-      </p>
+      <PageHeader
+        title="Blocked users"
+        description="Blocked people cannot see your dreams or comments, and you cannot see theirs. They are not told they were blocked."
+      />
 
       {list.error && list.items.length === 0 ? (
         <EmptyState
@@ -92,7 +93,7 @@ const BlockedUsersPage: React.FC = () => {
           <div ref={list.sentinelRef} aria-hidden className="h-1" />
         </>
       )}
-    </div>
+    </Page>
   );
 };
 

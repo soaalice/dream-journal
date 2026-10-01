@@ -9,6 +9,7 @@ import CalendarHeatmap from '../components/stats/CalendarHeatmap';
 import { MoodBars, PrivacySplit, Timeline, TopTags, Weekdays } from '../components/stats/Charts';
 import { Button, ButtonLink } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { Page, PageHeader } from '../components/ui/Page';
 import { Chip } from '../components/ui/Chip';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Skeleton } from '../components/ui/Skeleton';
@@ -31,11 +32,10 @@ const Tile: React.FC<{ icon: React.ReactNode; label: string; value: React.ReactN
   </div>
 );
 
-const Section: React.FC<{ title: string; hint?: string; children: React.ReactNode; className?: string }> = ({ title, hint, children, className = '' }) => (
+const ChartCard: React.FC<{ title: string; hint?: string; children: React.ReactNode; className?: string }> = ({ title, hint, children, className = '' }) => (
   <Card as="section" aria-label={title} className={className}>
-    <h2 className="font-serif text-xl font-bold">{title}</h2>
-    {hint && <p className="mb-4 text-sm text-muted">{hint}</p>}
-    {!hint && <div className="mb-4" />}
+    <h2 className="section-title">{title}</h2>
+    {hint ? <p className="meta mb-4">{hint}</p> : <div className="mb-4" />}
     {children}
   </Card>
 );
@@ -102,20 +102,20 @@ const StatsPage: React.FC = () => {
   const rangeLabel = RANGES.find((r) => r.value === range)?.label.toLowerCase() ?? '';
 
   return (
-    <div className="animate-fade-in">
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-serif text-3xl font-bold">Insights</h1>
-          <p className="text-muted">Patterns in your own dreams. Only you can see this page.</p>
-        </div>
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Time range">
-          {RANGES.map((r) => (
-            <Chip key={r.value} selected={range === r.value} onClick={() => setParams(r.value === '365' ? {} : { range: r.value }, { replace: true })}>
-              {r.label}
-            </Chip>
-          ))}
-        </div>
-      </div>
+    <Page>
+      <PageHeader
+        title="Insights"
+        description="Patterns in your own dreams. Only you can see this page."
+        actions={
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Time range">
+            {RANGES.map((r) => (
+              <Chip key={r.value} selected={range === r.value} onClick={() => setParams(r.value === '365' ? {} : { range: r.value }, { replace: true })}>
+                {r.label}
+              </Chip>
+            ))}
+          </div>
+        }
+      />
 
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-5">
         <Tile icon={<BarChart3 className="h-4 w-4" aria-hidden />} label="Dreams" value={totals.dreams} hint={totals.drafts > 0 ? `+ ${totals.drafts} ${totals.drafts === 1 ? 'draft' : 'drafts'}` : 'all time'} />
@@ -133,7 +133,7 @@ const StatsPage: React.FC = () => {
 
       {stats.insights.length > 0 && (
         <Card as="section" aria-labelledby="insights-title" className="mb-6 bg-accent-soft/40">
-          <h2 id="insights-title" className="mb-3 flex items-center gap-2 font-serif text-xl font-bold">
+          <h2 id="insights-title" className="section-title mb-3 flex items-center gap-2">
             <Lightbulb className="h-5 w-5 text-accent-text" aria-hidden />
             What stands out
           </h2>
@@ -149,30 +149,30 @@ const StatsPage: React.FC = () => {
         </Card>
       )}
 
-      <Section title="Your year in dreams" hint="Each square is a day. The darker it is, the more dreams you recorded." className="mb-6">
+      <ChartCard title="Your year in dreams" hint="Each square is a day. The darker it is, the more dreams you recorded." className="mb-6">
         <CalendarHeatmap heatmap={stats.heatmap} />
-      </Section>
+      </ChartCard>
 
       <div className="mb-6 grid gap-6 lg:grid-cols-2">
-        <Section title="How your dreams felt" hint={`${scope.dreams} ${scope.dreams === 1 ? 'dream' : 'dreams'} in the last ${rangeLabel === 'all time' ? 'while' : rangeLabel}`.replace('last all time', 'whole journal')}>
+        <ChartCard title="How your dreams felt" hint={`${scope.dreams} ${scope.dreams === 1 ? 'dream' : 'dreams'} in the last ${rangeLabel === 'all time' ? 'while' : rangeLabel}`.replace('last all time', 'whole journal')}>
           <MoodBars moods={stats.moods} />
-        </Section>
-        <Section title={stats.timeline.unit === 'day' ? 'Day by day' : 'Month by month'} hint="Colours show the mood of each dream.">
+        </ChartCard>
+        <ChartCard title={stats.timeline.unit === 'day' ? 'Day by day' : 'Month by month'} hint="Colours show the mood of each dream.">
           <Timeline timeline={stats.timeline} />
-        </Section>
+        </ChartCard>
       </div>
 
       <div className="mb-6 grid gap-6 lg:grid-cols-2">
-        <Section title="Recurring themes" hint="Your most used tags.">
+        <ChartCard title="Recurring themes" hint="Your most used tags.">
           <TopTags tags={stats.tags} />
-        </Section>
+        </ChartCard>
         <div className="space-y-6">
-          <Section title="Days you record" hint="Which weekday you tend to write your dreams down.">
+          <ChartCard title="Days you record" hint="Which weekday you tend to write your dreams down.">
             <Weekdays weekdays={stats.weekdays} />
-          </Section>
-          <Section title="Who sees them">
+          </ChartCard>
+          <ChartCard title="Who sees them">
             <PrivacySplit privacy={stats.privacy} />
-          </Section>
+          </ChartCard>
         </div>
       </div>
 
@@ -188,7 +188,7 @@ const StatsPage: React.FC = () => {
           </span>
         </p>
       )}
-    </div>
+    </Page>
   );
 };
 

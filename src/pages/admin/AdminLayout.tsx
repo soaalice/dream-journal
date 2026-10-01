@@ -4,6 +4,7 @@ import { ShieldCheck } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { AdminSummary } from '../../types/admin';
+import { PageHeader } from '../../components/ui/Page';
 
 export interface AdminOutletContext {
   summary: AdminSummary | null;
@@ -33,15 +34,12 @@ const AdminLayout: React.FC = () => {
 
   return (
     <div className="animate-fade-in">
-      <div className="mb-6 flex items-center gap-3">
-        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent-soft text-accent-text">
-          <ShieldCheck className="h-6 w-6" aria-hidden />
-        </span>
-        <div>
-          <h1 className="font-serif text-3xl font-bold">Moderation</h1>
-          <p className="text-muted">Review reports, remove content and manage suspensions. Every action is logged.</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Moderation"
+        description="Review reports, remove content and manage suspensions. Every action is logged."
+        icon={<ShieldCheck className="h-6 w-6" aria-hidden />}
+        className="!mb-5"
+      />
 
       <nav aria-label="Moderation" className="mb-6 flex gap-1 overflow-x-auto border-b border-line">
         <NavLink to="/admin/reports" className={tabClass}>

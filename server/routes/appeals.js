@@ -5,6 +5,8 @@ import Notification from '../models/Notification.js';
 import { authenticate } from '../middleware/auth.js';
 import { asyncHandler, HttpError } from '../utils/asyncHandler.js';
 import { validate } from '../utils/validation.js';
+import User from '../models/User.js';
+import { notifyStaffOfAppeal } from '../services/notifications.js';
 
 /**
  * An author appeals a moderator's removal of their dream or comment. The appeal starts from the notification they
@@ -35,8 +37,9 @@ export default ({ config, schemas, reportLimiter }) => {
         throw new HttpError(400, 'This decision can no longer be appealed');
       }
 
+      let appeal;
       try {
-        const appeal = await Appeal.create({
+        appeal = await Appeal.create({
           userId,
           targetType: comment ? 'comment' : 'dream',
           dreamId: dream._id,
@@ -56,6 +59,9 @@ export default ({ config, schemas, reportLimiter }) => {
         if (error.code === 11000) throw new HttpError(409, 'You already appealed this decision');
         throw error;
       }
+
+      const author = await User.findById(userId).select('name');
+      await notifyStaffOfAppeal({ appeal, authorName: author?.name ?? 'Unknown', excludeUserId: appeal.decidedBy });
 
       res.status(201).json({ message: 'Your appeal was sent. A moderator who was not involved will review it.' });
     })

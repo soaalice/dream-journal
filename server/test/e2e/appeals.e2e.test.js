@@ -94,6 +94,29 @@ test('moderator decisions, notices and appeals', async (t) => {
     assert.equal(after.moderation.appeal.status, 'open');
   });
 
+  await t.test('staff are notified of the appeal, except the moderator whose decision it is, and can filter their inbox', async () => {
+    const appealsOf = async (u, query = '') => (await u.c.get(`/notifications?group=appeals${query}`)).body;
+
+    const forMax = await appealsOf(max);
+    assert.equal(forMax.notifications.length, 1);
+    const n = forMax.notifications[0];
+    assert.equal(n.type, 'appeal');
+    assert.equal(n.appeal.authorName, 'Appeal-Author');
+    assert.equal(n.appeal.targetType, 'dream');
+    assert.equal(n.appeal.title, 'Taken down');
+    assert.equal(n.appeal.status, 'open');
+    assert.equal(forMax.unreadAppeals, 1);
+    assert.equal((await appealsOf(chief)).notifications.length, 1, 'administrators are told too');
+    assert.equal((await appealsOf(mia)).notifications.length, 0, 'not the moderator who decided');
+
+    // filters: activity excludes appeals, unread narrows, ordinary people never see appeal notices
+    assert.equal((await max.c.get('/notifications?group=activity')).body.notifications.some((x) => x.type === 'appeal'), false);
+    assert.equal((await appealsOf(max, '&unread=1')).notifications.length, 1);
+    assert.equal((await inbox(author)).notifications.some((x) => x.type === 'appeal'), false);
+    assert.equal((await author.c.get('/notifications?group=appeals')).body.notifications.length, 0);
+    assert.equal((await max.c.get('/notifications?group=nope')).status, 400);
+  });
+
   await t.test('staff see open appeals; the moderator who decided cannot decide it, another one can', async () => {
     assert.equal((await chief.c.get('/admin/summary')).body.openAppeals, 1);
     const list = (await max.c.get('/admin/appeals')).body;
@@ -106,6 +129,10 @@ test('moderator decisions, notices and appeals', async (t) => {
     assert.equal(detail.appeal.decidedBy, 'Appeal-Mia');
     assert.equal(detail.appeal.decidedByMe, true);
     assert.equal(detail.content.moderationState, 'removed');
+    assert.deepEqual(detail.target, { dreamId: dream._id, commentId: null }, 'staff can open the concerned content as a case');
+    assert.equal(detail.context, null);
+    const theCase = (await mia.c.get(`/admin/reports/case?dreamId=${dream._id}`)).body;
+    assert.equal(theCase.appeal.status, 'open', 'the case shows the appeal');
     assert.deepEqual(detail.reasons, ['harassment']);
     assert.equal(detail.author.email, null, 'moderators do not see emails');
     assert.equal((await chief.c.get(`/admin/appeals/${id}`)).body.author.email, 'appeal-author@example.com');
@@ -119,6 +146,9 @@ test('moderator decisions, notices and appeals', async (t) => {
       message: 'Sorry about that, it is visible again.'
     });
     assert.deepEqual(res.body, { status: 'overturned', restored: true, unsuspended: false });
+    const done = (await max.c.get('/notifications?group=appeals')).body;
+    assert.equal(done.unreadAppeals, 0, 'deciding clears the staff notification');
+    assert.equal(done.notifications[0].appeal.status, 'overturned');
     assert.equal((await max.c.post(`/admin/appeals/${id}/decide`, { decision: 'upheld' })).status, 404, 'decided already');
 
     // restored: visible to everyone again, and the author is told
@@ -204,6 +234,9 @@ test('suspension appeals', async (t) => {
   );
 
   assert.equal((await appeal({ message: 'I was quoting a film, not meaning it.' })).status, 201);
+  const adminNotice = (await chief.c.get('/notifications?group=appeals')).body.notifications[0];
+  assert.equal(adminNotice.appeal.targetType, 'account');
+  assert.equal((await mod.c.get('/notifications?group=appeals')).body.notifications.length, 0, 'moderators cannot decide these, so they are not asked');
   assert.equal((await appeal({ message: 'one more time to be sure' })).status, 409, 'one open appeal at a time');
   assert.equal((await login()).body.appealStatus, 'open');
 
