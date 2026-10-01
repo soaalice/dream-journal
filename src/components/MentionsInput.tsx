@@ -8,6 +8,11 @@ interface MentionsInputProps {
   rows?: number;
 }
 
+const extractMentionIds = (text: string): string[] => {
+  const ids = Array.from(text.matchAll(/@\[([^\]]+)\]\(([0-9a-fA-F]{24})\)/g), (m) => m[2]);
+  return Array.from(new Set(ids));
+};
+
 const MentionsInput: React.FC<MentionsInputProps> = ({
   value,
   onChange,
@@ -51,14 +56,7 @@ const MentionsInput: React.FC<MentionsInputProps> = ({
     }
 
     // Extract mentions from text
-    const mentionRegex = /@\[([^\]]+)\]\(([^)]+)\)/g;
-    const mentions: string[] = [];
-    let match2;
-    while ((match2 = mentionRegex.exec(text)) !== null) {
-      mentions.push(match2[2]); // Push the user ID
-    }
-
-    onChange(text, mentions);
+    onChange(text, extractMentionIds(text));
   };
 
   const insertMention = (userId: string, userName: string) => {
@@ -73,8 +71,7 @@ const MentionsInput: React.FC<MentionsInputProps> = ({
         `@[${userName}](${userId})` +
         afterCursor;
 
-      const newMentions = [...(value.match(/@\[([^\]]+)\]\(([^)]+)\)/g) || []), userId];
-      onChange(newValue, newMentions);
+      onChange(newValue, extractMentionIds(newValue));
     }
 
     setShowSuggestions(false);
@@ -89,6 +86,7 @@ const MentionsInput: React.FC<MentionsInputProps> = ({
         onChange={handleInput}
         placeholder={placeholder}
         rows={rows}
+        maxLength={1000}
         className={`
           w-full rounded-md px-3 py-2 resize-none 
           ${isDarkMode
@@ -108,6 +106,7 @@ const MentionsInput: React.FC<MentionsInputProps> = ({
         `}>
           {suggestions.map((user) => (
             <button
+              type="button"
               key={user._id}
               onClick={() => insertMention(user._id, user.name)}
               className={`

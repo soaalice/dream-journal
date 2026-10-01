@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Comment } from '../types';
+import { Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from '../utils/date';
 import Avatar from './ui/Avatar';
 import MentionsInput from './MentionsInput';
@@ -11,7 +12,8 @@ interface CommentSectionProps {
 }
 
 const CommentSection: React.FC<CommentSectionProps> = ({ dreamId, comments }) => {
-  const { user, addComment, isDarkMode } = useApp();
+  const { user, addComment, deleteComment, isDarkMode } = useApp();
+  const [error, setError] = useState<string | null>(null);
   const [commentText, setCommentText] = useState('');
   const [mentions, setMentions] = useState<string[]>([]);
 
@@ -19,25 +21,35 @@ const CommentSection: React.FC<CommentSectionProps> = ({ dreamId, comments }) =>
     e.preventDefault();
     if (commentText.trim()) {
       try {
+        setError(null);
         await addComment(dreamId, commentText, mentions);
         setCommentText('');
         setMentions([]);
-      } catch (error) {
-        console.error('Failed to add comment:', error);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to add comment');
       }
+    }
+  };
+
+  const handleDelete = async (commentId: string) => {
+    try {
+      setError(null);
+      await deleteComment(dreamId, commentId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete comment');
     }
   };
 
   const renderCommentContent = (content: string) => {
     // Replace mention placeholders with styled mentions
-    return content.replace(/@\[([^\]]+)\]\(([^)]+)\)/g, (match, name) => {
-      return `@${name}`;
-    });
+    return content.replace(/@\[([^\]]+)\]\(([^)]+)\)/g, (_match, name) => `@${name}`);
   };
 
   return (
     <div className={`${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
       <h3 className="text-lg font-semibold mb-4">Comments ({comments.length})</h3>
+
+      {error && <p role="alert" className="mb-3 text-sm text-red-500">{error}</p>}
 
       {user && (
         <form onSubmit={handleSubmit} className="mb-6">
@@ -82,8 +94,18 @@ const CommentSection: React.FC<CommentSectionProps> = ({ dreamId, comments }) =>
               `}>
                 <div className="flex justify-between">
                   <span className="font-medium">{comment.userName}</span>
-                  <span className="text-sm text-gray-500">
+                  <span className="flex items-center gap-2 text-sm text-gray-500">
                     {formatDistanceToNow(new Date(comment.createdAt))}
+                    {comment.canDelete && (
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(comment._id)}
+                        aria-label="Delete comment"
+                        className="hover:text-red-500"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </span>
                 </div>
                 <p className={`mt-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>

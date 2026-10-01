@@ -3,7 +3,7 @@ import React from 'react';
 interface TagBadgeProps {
   tag: string;
   size?: 'sm' | 'md' | 'lg';
-  onClick?: () => void;
+  onClick?: (e: React.MouseEvent) => void;
 }
 
 const TagBadge: React.FC<TagBadgeProps> = ({ tag, size = 'md', onClick }) => {

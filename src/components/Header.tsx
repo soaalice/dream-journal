@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Menu, Moon, Sun, PenLine, Home, User, Search, LogIn, UserPlus } from 'lucide-react';
+import { Menu, PenLine, Home, User, Search, LogIn, UserPlus } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import ThemeToggle from './ui/ThemeToggle';
 import Avatar from './ui/Avatar';
@@ -29,8 +29,8 @@ const Header: React.FC = () => {
 
   const navLinks = isAuthenticated ? [...publicNavLinks, ...privateNavLinks] : [...publicNavLinks, ...authNavLinks];
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/');
   };
 

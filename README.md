@@ -76,3 +76,7 @@ A dynamic feed displays public and anonymous dream entries from the community. A
 
 ### Community Interaction
 Like and comment on dreams shared by others to foster discussion and engagement.
+
+## Documentation
+
+Setup, architecture, API reference and security notes live in [docs/](docs/README.md).

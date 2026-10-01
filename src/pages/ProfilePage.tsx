@@ -1,21 +1,64 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { CalendarDays, Moon, PenLine, Settings } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { CalendarDays, Moon, PenLine, Settings, UserCheck, UserPlus } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { formatDate } from '../utils/date';
 import DreamCard from '../components/DreamCard';
 import Avatar from '../components/ui/Avatar';
+import { Dream, User } from '../types';
 
 const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
-  const { user, userDreams, isDarkMode } = useApp();
+  const { id } = useParams<{ id: string }>();
+  const { user: me, userDreams, isDarkMode, getUser, fetchUserDreams, toggleFollow } = useApp();
   const [filter, setFilter] = useState<'all' | 'public' | 'private' | 'anonymous'>('all');
-  
+  const [other, setOther] = useState<{ user: User; dreams: Dream[] } | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const isOwnProfile = !id || id === me?._id;
+
+  useEffect(() => {
+    if (isOwnProfile || !id) {
+      setOther(null);
+      return;
+    }
+    let cancelled = false;
+    setOther(null);
+    setLoadError(null);
+    Promise.all([getUser(id), fetchUserDreams(id)])
+      .then(([profile, dreams]) => !cancelled && setOther({ user: profile, dreams }))
+      .catch((err) => !cancelled && setLoadError(err instanceof Error ? err.message : 'Failed to load profile'));
+    return () => {
+      cancelled = true;
+    };
+  }, [id, isOwnProfile, getUser, fetchUserDreams]);
+
+  const handleFollow = async () => {
+    if (!other) return;
+    try {
+      const updated = await toggleFollow(other.user._id);
+      setOther({ ...other, user: updated });
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Failed to update follow');
+    }
+  };
+
+  const user = isOwnProfile ? me : other?.user ?? null;
+  const dreamsOfProfile = isOwnProfile ? userDreams : other?.dreams ?? [];
+
+  if (!isOwnProfile && !other) {
+    return (
+      <div className="flex justify-center py-16 text-gray-500">
+        {loadError ?? 'Loading...'}
+      </div>
+    );
+  }
+
   if (!user) {
     return (
       <div className="flex flex-col items-center justify-center h-64">
         <h2 className="text-xl mb-4">Please log in to view your profile</h2>
-        <button 
+        <button
           onClick={() => navigate('/auth')}
           className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors duration-200"
         >
@@ -24,11 +67,11 @@ const ProfilePage: React.FC = () => {
       </div>
     );
   }
-  
-  const filteredDreams = filter === 'all' 
-    ? userDreams 
-    : userDreams.filter(dream => dream.privacyLevel === filter);
-  
+
+  const filteredDreams = filter === 'all'
+    ? dreamsOfProfile
+    : dreamsOfProfile.filter(dream => dream.privacyLevel === filter);
+
   const tabClasses = {
     active: `
       border-b-2 border-purple-600 font-medium text-purple-600
@@ -37,12 +80,12 @@ const ProfilePage: React.FC = () => {
       text-gray-500 hover:text-gray-700 hover:border-gray-300 border-b-2 border-transparent
     `
   };
-  
+
   return (
     <div className={`max-w-4xl mx-auto px-4 py-8 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
       <div className={`
-        rounded-lg overflow-hidden shadow-lg 
-        ${isDarkMode ? 'bg-gray-800' : 'bg-white'} 
+        rounded-lg overflow-hidden shadow-lg
+        ${isDarkMode ? 'bg-gray-800' : 'bg-white'}
         p-6 mb-8
       `}>
         <div className="md:flex items-center justify-between">
@@ -56,7 +99,7 @@ const ProfilePage: React.FC = () => {
               </div>
             </div>
           </div>
-          
+
           <div className="mt-4 md:mt-0 flex flex-wrap gap-2">
             <div className={`
               flex items-center gap-2 px-4 py-2 rounded-md
@@ -65,7 +108,24 @@ const ProfilePage: React.FC = () => {
               <Moon className="h-5 w-5 text-purple-600" />
               <span className="font-medium">{user.dreamCount} Dreams</span>
             </div>
-            
+
+            <div className={`px-4 py-2 rounded-md ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+              <span className="font-medium">{user.followersCount} Followers</span>
+              <span className="mx-2 text-gray-400">•</span>
+              <span className="font-medium">{user.followingCount} Following</span>
+            </div>
+
+            {!isOwnProfile && (
+              <button
+                onClick={handleFollow}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors duration-200"
+              >
+                {user.isFollowing ? <UserCheck className="h-5 w-5" /> : <UserPlus className="h-5 w-5" />}
+                {user.isFollowing ? 'Following' : 'Follow'}
+              </button>
+            )}
+
+            {isOwnProfile && (<>
             <button
               onClick={() => navigate('/profile/edit')}
               className={`
@@ -77,7 +137,7 @@ const ProfilePage: React.FC = () => {
               <Settings className="h-5 w-5" />
               Edit Profile
             </button>
-            
+
             <button
               onClick={() => navigate('/new')}
               className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors duration-200"
@@ -85,10 +145,14 @@ const ProfilePage: React.FC = () => {
               <PenLine className="h-5 w-5" />
               New Dream
             </button>
+            </>)}
           </div>
         </div>
       </div>
-      
+
+      {user.bio && <p className="mb-6 text-gray-500">{user.bio}</p>}
+
+      {isOwnProfile && (
       <div className="mb-6">
         <div className="border-b border-gray-200">
           <nav className="flex space-x-8">
@@ -119,33 +183,38 @@ const ProfilePage: React.FC = () => {
           </nav>
         </div>
       </div>
+      )}
       
       <div>
         {filteredDreams.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {filteredDreams.map((dream) => (
-              <DreamCard key={dream._id} dream={dream} showPrivacy={false} />
+              <DreamCard key={dream._id} dream={dream} showPrivacy={isOwnProfile} />
             ))}
           </div>
         ) : (
           <div className={`
             text-center py-16
-            ${isDarkMode ? 'bg-gray-800' : 'bg-gray-50'} 
+            ${isDarkMode ? 'bg-gray-800' : 'bg-gray-50'}
             rounded-lg
           `}>
             <Moon className="h-12 w-12 mx-auto text-gray-400 mb-4" />
             <h3 className="text-lg font-medium mb-2">No dreams found</h3>
             <p className="text-gray-500 mb-4">
-              {filter === 'all'
-                ? "You haven't recorded any dreams yet."
-                : `You don't have any ${filter} dreams.`}
+              {!isOwnProfile
+                ? 'No public dreams yet.'
+                : filter === 'all'
+                  ? "You haven't recorded any dreams yet."
+                  : `You don't have any ${filter} dreams.`}
             </p>
-            <button
-              onClick={() => navigate('/new')}
-              className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors duration-200"
-            >
-              Record New Dream
-            </button>
+            {isOwnProfile && (
+              <button
+                onClick={() => navigate('/new')}
+                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors duration-200"
+              >
+                Record New Dream
+              </button>
+            )}
           </div>
         )}
       </div>

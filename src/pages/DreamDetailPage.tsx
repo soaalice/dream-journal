@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { formatDate } from '../utils/date';
 import MoodBadge from '../components/ui/MoodBadge';
@@ -12,9 +12,36 @@ import Avatar from '../components/ui/Avatar';
 const DreamDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { allDreams, user, isDarkMode } = useApp();
+  const { allDreams, fetchDream, deleteDream, isDarkMode } = useApp();
+  const [status, setStatus] = useState<'loading' | 'ready' | 'missing'>('loading');
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  const dream = allDreams.find(dream => dream._id === id);
+  const dream = allDreams.find(d => d._id === id);
+
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    fetchDream(id)
+      .then(() => !cancelled && setStatus('ready'))
+      .catch(() => !cancelled && setStatus('missing'));
+    return () => {
+      cancelled = true;
+    };
+  }, [id, fetchDream]);
+
+  const handleDelete = async () => {
+    if (!dream || !window.confirm('Delete this dream permanently?')) return;
+    try {
+      await deleteDream(dream._id);
+      navigate('/profile');
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Failed to delete dream');
+    }
+  };
+
+  if (!dream && status === 'loading') {
+    return <div className="flex justify-center py-16 text-gray-500">Loading...</div>;
+  }
 
   if (!dream) {
     return (
@@ -30,8 +57,7 @@ const DreamDetailPage: React.FC = () => {
     );
   }
 
-  const isOwnDream = user?._id === dream.userId;
-  const isAnonymous = dream.privacyLevel === 'anonymous';
+  const isOwnDream = dream.isOwner;
 
   return (
     <div className={`max-w-3xl mx-auto px-4 py-8 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
@@ -54,9 +80,9 @@ const DreamDetailPage: React.FC = () => {
       `}>
         <div className="flex justify-between items-start mb-6">
           <div className="flex items-center space-x-3">
-            {!isAnonymous && (
+            {dream.userId && (
               <Avatar
-                src={user?._id === dream.userId ? user.avatarUrl : 'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=150'}
+                src={dream.userId.avatarUrl}
                 alt={dream.userName}
                 size="lg"
               />
@@ -65,9 +91,7 @@ const DreamDetailPage: React.FC = () => {
             <div>
               <h1 className="text-2xl font-serif font-bold">{dream.title}</h1>
               <div className="flex items-center text-sm text-gray-500 mt-1">
-                <span>
-                  {isAnonymous ? 'Anonymous' : dream.userName}
-                </span>
+                <span>{dream.userName}</span>
                 <span className="mx-1">•</span>
                 <span>{formatDate(new Date(dream.createdAt))}</span>
               </div>
@@ -91,13 +115,21 @@ const DreamDetailPage: React.FC = () => {
             <TagBadge
               key={tag}
               tag={tag}
-              onClick={() => navigate(`/explore?tag=${tag}`)}
+              onClick={() => navigate(`/explore?tag=${encodeURIComponent(tag)}`)}
             />
           ))}
         </div>
 
         {isOwnDream && (
-          <div className="mb-8 flex justify-end">
+          <div className="mb-8 flex justify-end gap-2">
+            {actionError && <p role="alert" className="text-red-500 text-sm self-center">{actionError}</p>}
+            <button
+              onClick={handleDelete}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors duration-200"
+            >
+              <Trash2 className="w-5 h-5" />
+              Delete
+            </button>
             <button
               onClick={() => navigate(`/dream/${dream._id}/edit`)}
               className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors duration-200"

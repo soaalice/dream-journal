@@ -8,6 +8,7 @@ import PrivacyBadge from './ui/PrivacyBadge';
 
 interface DreamFormProps {
   editMode?: boolean;
+  dreamId?: string;
   initialData?: {
     title: string;
     content: string;
@@ -19,6 +20,7 @@ interface DreamFormProps {
 
 const DreamForm: React.FC<DreamFormProps> = ({
   editMode = false,
+  dreamId,
   initialData = {
     title: '',
     content: '',
@@ -28,7 +30,8 @@ const DreamForm: React.FC<DreamFormProps> = ({
   }
 }) => {
   const navigate = useNavigate();
-  const { addDream, isDarkMode } = useApp();
+  const { addDream, updateDream, isDarkMode } = useApp();
+  const [submitting, setSubmitting] = useState(false);
   
   const [title, setTitle] = useState(initialData.title);
   const [content, setContent] = useState(initialData.content);
@@ -48,7 +51,7 @@ const DreamForm: React.FC<DreamFormProps> = ({
   
   const addTag = () => {
     const trimmedTag = newTag.trim().toLowerCase();
-    if (trimmedTag && !tags.includes(trimmedTag)) {
+    if (trimmedTag && trimmedTag.length <= 30 && tags.length < 10 && !tags.includes(trimmedTag)) {
       setTags([...tags, trimmedTag]);
       setNewTag('');
     }
@@ -70,33 +73,41 @@ const DreamForm: React.FC<DreamFormProps> = ({
     
     if (!title.trim()) {
       newErrors.title = 'Title is required';
+    } else if (title.length > 120) {
+      newErrors.title = 'Title must be at most 120 characters';
     }
     
     if (!content.trim()) {
       newErrors.content = 'Dream description is required';
-    } else if (content.length < 10) {
+    } else if (content.trim().length < 10) {
       newErrors.content = 'Dream description must be at least 10 characters';
+    } else if (content.length > 10000) {
+      newErrors.content = 'Dream description must be at most 10000 characters';
     }
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validate()) return;
-    
-    addDream({
-      title,
-      content,
-      privacyLevel,
-      tags,
-      mood,
-      likes: 0
-    });
-    
-    navigate('/profile');
+
+    setSubmitting(true);
+    try {
+      const payload = { title: title.trim(), content: content.trim(), privacyLevel, tags, mood };
+      if (editMode && dreamId) {
+        await updateDream(dreamId, payload);
+        navigate(`/dream/${dreamId}`);
+      } else {
+        await addDream(payload);
+        navigate('/profile');
+      }
+    } catch (error) {
+      setErrors({ form: error instanceof Error ? error.message : 'Failed to save dream' });
+      setSubmitting(false);
+    }
   };
   
   return (
@@ -109,6 +120,7 @@ const DreamForm: React.FC<DreamFormProps> = ({
           <input
             type="text"
             id="title"
+            maxLength={120}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Enter a title for your dream"
@@ -137,6 +149,7 @@ const DreamForm: React.FC<DreamFormProps> = ({
           </label>
           <textarea
             id="content"
+            maxLength={10000}
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder="Describe your dream in detail..."
@@ -254,6 +267,13 @@ const DreamForm: React.FC<DreamFormProps> = ({
           </div>
         </div>
         
+        {errors.form && (
+          <p role="alert" className="text-red-500 text-sm flex items-center">
+            <AlertTriangle className="w-4 h-4 mr-1" />
+            {errors.form}
+          </p>
+        )}
+
         <div className="flex justify-end space-x-3">
           <button
             type="button"
@@ -271,7 +291,8 @@ const DreamForm: React.FC<DreamFormProps> = ({
           </button>
           <button
             type="submit"
-            className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors duration-200"
+            disabled={submitting}
+            className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors duration-200 disabled:opacity-50"
           >
             {editMode ? 'Update Dream' : 'Save Dream'}
           </button>

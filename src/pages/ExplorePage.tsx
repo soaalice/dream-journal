@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { Search, Filter, X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import DreamCard from '../components/DreamCard';
 import MoodBadge from '../components/ui/MoodBadge';
-import { DreamMood } from '../types';
+import { Dream, DreamMood } from '../types';
 
 const ExplorePage: React.FC = () => {
   const location = useLocation();
-  const navigate = useNavigate();
-  const { publicFeed, isDarkMode } = useApp();
+  const { publicFeed, fetchFeed, isDarkMode } = useApp();
   
   const queryParams = new URLSearchParams(location.search);
   const initialTag = queryParams.get('tag') || '';
@@ -18,6 +17,48 @@ const ExplorePage: React.FC = () => {
   const [selectedTags, setSelectedTags] = useState<string[]>(initialTag ? [initialTag] : []);
   const [selectedMoods, setSelectedMoods] = useState<DreamMood[]>([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [results, setResults] = useState<Dream[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const filterKey = `${debouncedSearch}|${selectedTags.join(',')}|${selectedMoods.join(',')}`;
+
+  // Filtering and pagination are done by the server so results are not limited to what was preloaded.
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setLoadError(null);
+    fetchFeed({
+      page,
+      limit: 12,
+      q: debouncedSearch || undefined,
+      tag: selectedTags.join(',') || undefined,
+      mood: selectedMoods.join(',') || undefined
+    })
+      .then((res) => {
+        if (cancelled) return;
+        setResults((prev) => (page === 1 ? res.dreams : [...prev, ...res.dreams]));
+        setHasMore(res.hasMore);
+      })
+      .catch((err) => !cancelled && setLoadError(err instanceof Error ? err.message : 'Failed to load dreams'))
+      .finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterKey, page, fetchFeed]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filterKey]);
   
   useEffect(() => {
     if (initialTag && !selectedTags.includes(initialTag)) {
@@ -27,9 +68,7 @@ const ExplorePage: React.FC = () => {
   
   // Extract all unique tags from dreams
   const allTags = Array.from(
-    new Set(
-      publicFeed.flatMap(dream => dream.tags)
-    )
+    new Set([...selectedTags, ...publicFeed.flatMap(dream => dream.tags)])
   );
   
   const moods: DreamMood[] = [
@@ -59,22 +98,7 @@ const ExplorePage: React.FC = () => {
     setSelectedMoods([]);
   };
   
-  const filteredDreams = publicFeed.filter(dream => {
-    // Filter by search term
-    const matchesSearch = searchTerm === '' || 
-      dream.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      dream.content.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    // Filter by tags
-    const matchesTags = selectedTags.length === 0 || 
-      selectedTags.some(tag => dream.tags.includes(tag));
-    
-    // Filter by moods
-    const matchesMoods = selectedMoods.length === 0 || 
-      selectedMoods.includes(dream.mood);
-    
-    return matchesSearch && matchesTags && matchesMoods;
-  });
+  const filteredDreams = results;
   
   return (
     <div className={`max-w-5xl mx-auto px-4 py-8 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
@@ -213,10 +237,12 @@ const ExplorePage: React.FC = () => {
       </div>
       
       <div>
-        {filteredDreams.length > 0 ? (
+        {loadError && <p role="alert" className="mb-4 text-red-500">{loadError}</p>}
+        {loading && filteredDreams.length === 0 && <p className="text-center py-16 text-gray-500">Loading...</p>}
+        {!loading || filteredDreams.length > 0 ? (filteredDreams.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {filteredDreams.map((dream) => (
-              <DreamCard key={dream.id} dream={dream} />
+              <DreamCard key={dream._id} dream={dream} />
             ))}
           </div>
         ) : (
@@ -235,6 +261,17 @@ const ExplorePage: React.FC = () => {
               className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors duration-200"
             >
               Reset Filters
+            </button>
+          </div>
+        )) : null}
+        {hasMore && (
+          <div className="flex justify-center mt-8">
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              disabled={loading}
+              className="px-5 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50"
+            >
+              {loading ? 'Loading...' : 'Load more'}
             </button>
           </div>
         )}

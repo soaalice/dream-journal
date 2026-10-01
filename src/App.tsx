@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
 import { AppProvider, useApp } from './context/AppContext';
 import Header from './components/Header';
 import HomePage from './pages/HomePage';
@@ -7,12 +8,17 @@ import DreamDetailPage from './pages/DreamDetailPage';
 import ProfilePage from './pages/ProfilePage';
 import ExplorePage from './pages/ExplorePage';
 import CreateDreamPage from './pages/CreateDreamPage';
+import EditDreamPage from './pages/EditDreamPage';
 import EditProfilePage from './pages/EditProfilePage';
 import AuthPage from './pages/AuthPage';
 
 const AppContent: React.FC = () => {
-  const { isDarkMode, isAuthenticated } = useApp();
-  
+  const { isDarkMode, isAuthenticated, loading } = useApp();
+
+  if (loading) {
+    return <div className="flex min-h-screen items-center justify-center">Loading...</div>;
+  }
+
   return (
     <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'} transition-colors duration-300`}>
       <Header />
@@ -21,10 +27,10 @@ const AppContent: React.FC = () => {
           <Route path="/auth" element={<AuthPage />} />
           <Route path="/" element={<HomePage />} />
           <Route path="/dream/:id" element={<DreamDetailPage />} />
-          <Route path="/dream/:id/edit" element={isAuthenticated ? <CreateDreamPage /> : <AuthPage />} />
+          <Route path="/dream/:id/edit" element={isAuthenticated ? <EditDreamPage /> : <AuthPage />} />
           <Route path="/profile" element={isAuthenticated ? <ProfilePage /> : <AuthPage />} />
-          <Route path="/profile/:id" element={isAuthenticated ? <ProfilePage /> : <AuthPage />} />
           <Route path="/profile/edit" element={isAuthenticated ? <EditProfilePage /> : <AuthPage />} />
+          <Route path="/profile/:id" element={isAuthenticated ? <ProfilePage /> : <AuthPage />} />
           <Route path="/explore" element={<ExplorePage />} />
           <Route path="/new" element={isAuthenticated ? <CreateDreamPage /> : <AuthPage />} />
         </Routes>
@@ -35,11 +41,13 @@ const AppContent: React.FC = () => {
 
 function App() {
   return (
-    <AppProvider>
-      <Router>
-        <AppContent />
-      </Router>
-    </AppProvider>
+    <AuthProvider>
+      <AppProvider>
+        <Router>
+          <AppContent />
+        </Router>
+      </AppProvider>
+    </AuthProvider>
   );
 }
 

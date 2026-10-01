@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Dream } from '../types';
 import { formatDistanceToNow } from '../utils/date';
@@ -28,25 +28,20 @@ const DreamCard: React.FC<DreamCardProps> = ({
     privacyLevel,
     tags,
     mood,
-    likes,
+    likedByMe,
+    likesCount,
     comments
   } = dream;
 
   const navigate = useNavigate();
   const { user, likeDream, isDarkMode } = useApp();
-  const [isLiked, setIsLiked] = useState(false);
-
-  useEffect(() => {
-    if (user && dream.likes.includes(user._id)) {
-      setIsLiked(true);
-    }
-  }, [user, dream.likes]);
+  const isLiked = likedByMe;
 
   const truncatedContent = content.length > 150
     ? `${content.substring(0, 150)}...`
     : content;
 
-  const isAnonymous = privacyLevel === 'anonymous';
+  const showAuthor = userId !== null;
 
   const handleLike = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -56,7 +51,6 @@ const DreamCard: React.FC<DreamCardProps> = ({
     }
     try {
       await likeDream(_id);
-      setIsLiked(!isLiked);
     } catch (error) {
       console.error('Error liking dream:', error);
     }
@@ -78,8 +72,8 @@ const DreamCard: React.FC<DreamCardProps> = ({
 
   const handleProfileClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!isAnonymous) {
-      navigate(`/profile/${userId}`);
+    if (userId) {
+      navigate(`/profile/${userId._id}`);
     }
   };
 
@@ -94,7 +88,7 @@ const DreamCard: React.FC<DreamCardProps> = ({
       <div className="p-5">
         <div className="flex justify-between items-start mb-3">
           <div className="flex items-center space-x-3">
-            {!isAnonymous && (
+            {showAuthor && (
               <div onClick={handleProfileClick}>
                 <Avatar
                   src={userId.avatarUrl}
@@ -107,9 +101,7 @@ const DreamCard: React.FC<DreamCardProps> = ({
             <div>
               <h2 className="text-lg font-bold font-serif mb-1">{title}</h2>
               <div className="flex items-center text-sm text-gray-500">
-                <span>
-                  {isAnonymous ? 'Anonymous' : userName}
-                </span>
+                <span>{userName}</span>
                 <span className="mx-1">•</span>
                 <span>{formatDistanceToNow(new Date(createdAt))}</span>
               </div>
@@ -131,7 +123,7 @@ const DreamCard: React.FC<DreamCardProps> = ({
             <TagBadge
               key={tag}
               tag={tag}
-              onClick={(e) => handleTagClick(e as React.MouseEvent, tag)}
+              onClick={(e) => handleTagClick(e, tag)}
             />
           ))}
         </div>
@@ -148,7 +140,7 @@ const DreamCard: React.FC<DreamCardProps> = ({
             disabled={!user}
           >
             <Heart className="w-5 h-5" fill={isLiked ? 'currentColor' : 'none'} />
-            <span>{dream.likes.length}</span>
+            <span>{likesCount}</span>
           </button>
 
           <button

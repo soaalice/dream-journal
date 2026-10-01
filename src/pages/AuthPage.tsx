@@ -16,7 +16,12 @@ const loginSchema = z.object({
 const registerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  password: z
+    .string()
+    .min(8, 'Password must be at least 8 characters')
+    .max(72, 'Password must be at most 72 characters')
+    .regex(/[A-Za-z]/, 'Password must contain a letter')
+    .regex(/\d/, 'Password must contain a number'),
   confirmPassword: z.string(),
   avatarUrl: z.string().url('Invalid URL').or(z.string().length(0)),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -27,7 +32,7 @@ const registerSchema = z.object({
 const AuthPage: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
   const navigate = useNavigate();
-  const { login, register, isDarkMode } = useApp();
+  const { login, register, isDarkMode, error: authError } = useApp();
   
   const { register: registerForm, handleSubmit: handleLoginSubmit, formState: { errors: loginErrors } } = 
     useForm<LoginCredentials>({
@@ -70,6 +75,12 @@ const AuthPage: React.FC = () => {
           <h2 className="text-3xl font-bold font-serif text-center mb-8">
             {isLogin ? 'Welcome Back' : 'Create Account'}
           </h2>
+          {authError && (
+            <p role="alert" className="text-red-500 text-sm flex items-center justify-center">
+              <AlertTriangle className="w-4 h-4 mr-1" />
+              {authError}
+            </p>
+          )}
         </div>
         
         {isLogin ? (

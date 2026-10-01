@@ -7,12 +7,17 @@ import { useApp } from '../context/AppContext';
 import { ProfileUpdateData } from '../types';
 import { AlertTriangle } from 'lucide-react';
 import EmojiAvatarPicker from '../components/EmojiAvatarPicker';
+import AccountSecurity from '../components/AccountSecurity';
 
 const profileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   bio: z.string().max(160, 'Bio must be less than 160 characters'),
   location: z.string().max(100, 'Location must be less than 100 characters'),
-  website: z.string().url('Invalid URL').or(z.string().length(0)),
+  website: z
+    .string()
+    .url('Invalid URL')
+    .refine((v) => /^https?:/i.test(v), 'Website must start with http(s)://')
+    .or(z.string().length(0)),
   avatarUrl: z.string().url('Invalid URL').or(z.string().length(0)),
 });
 
@@ -185,6 +190,8 @@ const EditProfilePage: React.FC = () => {
           </button>
         </div>
       </form>
+
+      <AccountSecurity />
     </div>
   );
 };

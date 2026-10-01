@@ -1,4 +1,4 @@
-export const formatDistanceToNow = (date: any): string => {
+export const formatDistanceToNow = (date: Date | string): string => {
   // Vérifier si la date est une chaîne de caractères et la convertir en Date si nécessaire
   if (typeof date === 'string') {
     date = new Date(date);
@@ -29,7 +29,7 @@ export const formatDistanceToNow = (date: any): string => {
   }
 };
 
-export const formatDate = (date: any): string => {
+export const formatDate = (date: Date | string): string => {
   if (typeof date === 'string') {
     date = new Date(date);
   }
